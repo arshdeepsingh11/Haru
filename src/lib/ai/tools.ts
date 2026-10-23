@@ -15,6 +15,7 @@ import { localTime } from "../domain/time";
 import { CARD_KEYS, CARDS, type CardKey } from "../dashboard-registry";
 import { changeCards, getCards } from "../server/services/cards";
 import { completeOnboarding } from "../server/services/prefs";
+import { forget, remember } from "../server/services/memory";
 import { createJob, getJob, jobLabel, listJobs, payRuleOf, updateJob, wagesFor } from "../server/services/jobs";
 import { createShift, deleteShift, getShift, listShifts, updateShift } from "../server/services/shifts";
 import { createOpportunity, describeOpportunity, getOpportunity, listOpportunities, updateOpportunityStatus } from "../server/services/opportunities";
@@ -76,6 +77,18 @@ export interface ToolDef<S extends z.ZodType = z.ZodType> {
 
 function tool<S extends z.ZodType>(t: ToolDef<S>): ToolDef<S> {
   return t;
+}
+
+/** Haru must use the person's real pay calendar, never a guess. */
+function needsPayDetails(a: { pay_frequency?: string; next_payday?: string; payday_weekday?: number; period_anchor_date?: string; pay_days?: number[] }, ctx: z.RefinementCtx) {
+  const f = a.pay_frequency;
+  if (!f) return;
+  if (f === "weekly" && !a.next_payday && a.payday_weekday == null && !a.period_anchor_date)
+    ctx.addIssue({ code: "custom", message: "Weekly pay needs payday_weekday (e.g. 5 for Friday) or next_payday. Ask the user which day they're paid if you don't know." });
+  if (f === "biweekly" && !a.next_payday && !a.period_anchor_date)
+    ctx.addIssue({ code: "custom", message: "Every-2-weeks pay needs next_payday (the date of their next payday). Ask the user." });
+  if ((f === "semimonthly" || f === "monthly") && !a.pay_days?.length)
+    ctx.addIssue({ code: "custom", message: "Twice-a-month/monthly pay needs pay_days, e.g. [15, 30] (31 = last day of month). Ask the user which days they're paid." });
 }
 
 const money = (ctx: Ctx, c: number | null | undefined) => (c == null ? null : formatMoney(c, ctx.currency));
@@ -379,16 +392,16 @@ export const TOOLS: ToolDef[] = [
   // ------------------------------------------------------------------ writes: work
   tool({
     name: "create_job",
-    description: "Add a regular, ongoing job. NEVER use for a one-time offer — use create_work_opportunity for those.",
-    schema: V.JobCreate,
+    description: "Add a regular, ongoing job. NEVER use for a one-time offer — use create_work_opportunity for those. Include the pay calendar in the same call when you know it (weekly: payday_weekday or next_payday; every 2 weeks: next_payday; twice a month/monthly: pay_days) and the weekly schedule in regular_schedule (several entries per weekday are fine; overnight shifts keep the real end time, e.g. 23:30 to 03:30). The result tells you the computed next payday: check it against what the user said.",
+    schema: V.JobCreate.superRefine(needsPayDetails),
     risk: "write",
     run: (ctx, a) => createJob(ctx, a, "ai"),
   }),
   tool({
     name: "update_job",
-    description: "Change a job's details, wage (adds wage history; past shifts keep their rate), schedule or payroll rules.",
-    schema: V.JobUpdate,
-    risk: (a) => (a.hourly_rate != null || a.pay_frequency || a.period_anchor_date || a.payday_offset_days != null || a.payday_weekend_rule || a.semimonthly_split_day != null || a.regular_schedule || a.status === "ended" ? "confirm" : "write"),
+    description: "Change a job's details, wage (adds wage history; past shifts keep their rate), weekly schedule or pay calendar. Use it right away when the user corrects a payday. The result tells you the computed next payday: check it against what the user said.",
+    schema: V.JobUpdate.superRefine(needsPayDetails),
+    risk: (a) => (a.hourly_rate != null || a.status === "ended" ? "confirm" : "write"),
     preview: async (ctx, a) => {
       const j = await getJob(ctx, a.job_id);
       const parts = Object.entries(a).filter(([k, v]) => k !== "job_id" && v !== undefined).map(([k, v]) => `${k.replace(/_/g, " ")} → ${typeof v === "object" ? JSON.stringify(v) : v}`);
@@ -561,6 +574,23 @@ export const TOOLS: ToolDef[] = [
       const r = await changeCards(ctx, a);
       return { summary: r.summary, undo: [{ op: "cards", cards: r.prev }], display: { kind: "dashboard", added: r.added, removed: r.removed }, cardsAdded: r.added, data: { now_showing: (await getCards(ctx)).show } };
     },
+  }),
+  tool({
+    name: "remember",
+    description: "Save short facts about this person that should shape every future answer: corrections they made ('BioARO pays on the 15th and 30th, not the 3rd'), plans ('sends 2,000 CAD to family in India every month from the BioARO paycheck on the 15th'), preferences ('wants short answers', 'uses INR for remittances'), and patterns. One fact per item, plain sentence, max 300 characters. Don't store what's already a record (jobs, bills, debts) unless it adds context.",
+    schema: z.object({ facts: z.array(z.string().min(3).max(300)).min(1).max(8) }),
+    risk: "write",
+    run: async (ctx, a) => {
+      const r = await remember(ctx, a.facts);
+      return { summary: `Remembered: ${a.facts.join(" · ")}`, undo: r.ids.map((id) => ({ op: "delete" as const, table: "user_memory", id: String(id) })) };
+    },
+  }),
+  tool({
+    name: "forget",
+    description: "Delete a remembered fact (by its id from WHAT YOU KNOW) when it's wrong or out of date.",
+    schema: z.object({ memory_id: z.number().int().positive() }),
+    risk: "write",
+    run: async (ctx, a) => ({ summary: `Forgot: ${await forget(ctx, a.memory_id)}` }),
   }),
   tool({
     name: "complete_setup",
