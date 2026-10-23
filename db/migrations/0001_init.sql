@@ -419,3 +419,17 @@ create table dashboard_preferences (
   previous_layout jsonb,
   updated_at timestamptz not null default now()
 );
+
+create table activity_log (
+  id bigserial primary key,
+  user_id uuid not null references app_users(id) on delete cascade,
+  entity text not null,
+  entity_id uuid,
+  action text not null,
+  actor text not null check (actor in ('user','ai','system')),
+  summary text,
+  before jsonb,
+  after jsonb,
+  created_at timestamptz not null default now()
+);
+create index activity_user_idx on activity_log(user_id, created_at desc);
