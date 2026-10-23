@@ -4,6 +4,8 @@
 
 HARU is a personal work-and-money assistant: one AI command center and one adaptive dashboard over a single PostgreSQL database. It tracks multiple jobs with independent payroll rules, shifts, one-time work offers, paychecks, cash, bills, savings goals and debt. It sends real push notifications from the server, so reminders arrive even when the site isn't open.
 
+See **[HARU.md](HARU.md)** for what HARU is, who it's for and how the shift loop works.
+
 Every financial number is computed by deterministic code from stored records. The AI understands requests and calls authorised, validated tools; it never does the arithmetic and never writes to the database directly.
 
 ---
@@ -13,6 +15,7 @@ Every financial number is computed by deterministic code from stored records. Th
 | Area | Where |
 | --- | --- |
 | Schema, constraints, views, RLS lockdown | `db/migrations/0001_init.sql` |
+| Shift loop: attendance, check-out, custom pay calendars, behaviour memory | `db/migrations/0002_shift_loop.sql` |
 | Database integrity tests (14) | `db/tests/integrity.sql` |
 | Pure financial / payroll / time-zone logic | `src/lib/domain/*` |
 | User-scoped services (jobs, shifts, payroll, money, reports, dashboard) | `src/lib/server/services/*` |
@@ -55,7 +58,7 @@ The migration enables row-level security with **no policies** on every table and
 
 ### 3. AI
 
-Create an API key at [console.anthropic.com](https://console.anthropic.com) and set `ANTHROPIC_API_KEY`. Optionally set `HARU_AI_MODEL` (default `claude-sonnet-5-5`). Without a key, everything except the chat works, and the chat says plainly that the AI isn't configured.
+Free option: create a key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey) and set `GEMINI_API_KEY` (Gemini is preferred when set; override the model with `HARU_AI_MODEL`). Or create a key at [console.anthropic.com](https://console.anthropic.com) and set `ANTHROPIC_API_KEY` (with `HARU_AI_PROVIDER=anthropic` if both are set). Optionally set `HARU_AI_MODEL` (default `claude-sonnet-5-5`). Without a key, everything except the chat works, and the chat says plainly that the AI isn't configured.
 
 To use another vendor later, add an adapter implementing `ChatProvider` in `src/lib/ai/` and return it from `getProvider()`.
 
@@ -124,6 +127,7 @@ Reminder categories and timing (minutes before shifts, the time to nudge you to 
 | `DATABASE_URL_MIGRATIONS` | for migrations | Session pooler / direct (5432). Falls back to `DATABASE_URL`. |
 | `NEXT_PUBLIC_SUPABASE_URL` | yes | Public. |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | yes | Public by design; it cannot read HARU's tables (see RLS above). |
+| `GEMINI_API_KEY` | for the AI (free) | Server only. Preferred when set. |
 | `ANTHROPIC_API_KEY` | for the AI | Server only. |
 | `HARU_AI_MODEL` | no | Default `claude-sonnet-5-5`. |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | for push | Public. |
