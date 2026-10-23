@@ -465,3 +465,24 @@ select g.id as goal_id, g.user_id, g.name, g.status, g.target_cents, g.target_da
 from savings_goals g
 left join goal_contributions c on c.goal_id = g.id and c.user_id = g.user_id
 group by g.id;
+
+-- ---------------------------------------------------------------------------
+-- Lock the tables away from Supabase's public Data API (anon/authenticated).
+-- HARU's server connects as the database owner and enforces user scoping in
+-- every query; RLS with no policies denies everything to other roles.
+-- ---------------------------------------------------------------------------
+do $$
+declare r record;
+begin
+  for r in select tablename from pg_tables where schemaname = 'public' loop
+    execute format('alter table public.%I enable row level security', r.tablename);
+  end loop;
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    execute 'revoke all on all tables in schema public from anon, authenticated';
+    execute 'revoke all on all sequences in schema public from anon, authenticated';
+  end if;
+end $$;
+
+alter view account_balances set (security_invoker = true);
+alter view debt_balances set (security_invoker = true);
+alter view goal_progress set (security_invoker = true);
