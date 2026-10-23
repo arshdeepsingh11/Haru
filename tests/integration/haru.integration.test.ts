@@ -28,6 +28,7 @@ const { applyUndo } = await import("../../src/lib/server/undo");
 const agent = await import("../../src/lib/ai/agent");
 const loop = await import("../../src/lib/server/services/shiftloop");
 const coach = await import("../../src/lib/server/services/coach");
+const cardsSvc = await import("../../src/lib/server/services/cards");
 const { AppError } = await import("../../src/lib/server/errors");
 const { addDays, weekdayOf } = await import("../../src/lib/domain/time");
 import type { ChatProvider, ChatResponse } from "../../src/lib/ai/provider";
@@ -488,6 +489,53 @@ test("notifications: shift reminder carries earnings and buttons; can't-go cance
   const [after] = await sql<{ n: number }[]>`select count(*)::int as n from reminders where user_id = ${c.userId} and category = 'checkout' and status = 'pending'`;
   assert.equal(after.n, 0);
   await sql`delete from app_users where id = ${c.userId}`;
+});
+
+test("AI-built dashboard: starts empty, grows as Haru saves things, remembers removals, setup completes", { skip }, async () => {
+  const C = randomUUID();
+  await sql`insert into app_users (id, email) values (${C}, ${`${C}@test.local`})`;
+  await sql`insert into user_preferences (user_id) values (${C})`;
+  let c = await ctxForUser(C);
+  assert.equal(c.prefs.onboarded_at, null);
+  assert.deepEqual((await dash.getDashboard(c)).cards, [], "a new person sees an empty dashboard");
+
+  const t1 = await agent.runTurn(c, { text: "I work at BioARO for $22 an hour" }, { provider: scripted([() => call("create_job", { employer: "BioARO", hourly_rate: 22 }), () => say("Saved BioARO.\n[[Every week|Every 2 weeks]]")]) });
+  assert.deepEqual(t1.cardsAdded, ["next_shift", "paychecks", "week"]);
+  assert.equal(t1.changed, true);
+  assert.deepEqual((await dash.getDashboard(c)).cards, ["next_shift", "paychecks", "week"]);
+
+  const t2 = await agent.runTurn(c, { text: "I owe $2400 on my Visa at 22.99%" }, { provider: scripted([() => call("create_debt", { name: "Visa", balance: 2400, interest_rate_percent: 22.99, minimum_payment: 60 }), () => say("Tracked.")]) });
+  assert.deepEqual(t2.cardsAdded, ["payoff", "debts"]);
+  assert.deepEqual((await dash.getDashboard(c)).cards, ["next_shift", "paychecks", "week", "payoff", "debts"], "new cards land in their natural place");
+
+  const t3 = await agent.runTurn(c, { text: "remove debts, put payoff first" }, { provider: scripted([() => call("build_dashboard", { remove: ["debts"], order: ["payoff"] }), () => say("Done.")]) });
+  assert.equal(t3.assistant.actions[0].status, "completed");
+  assert.deepEqual((await dash.getDashboard(c)).cards, ["payoff", "next_shift", "paychecks", "week"]);
+  await agent.runTurn(c, { text: "another debt" }, { provider: scripted([() => call("create_debt", { name: "Loan", balance: 500 }), () => say("Tracked.")]) });
+  assert.ok(!(await dash.getDashboard(c)).cards.includes("debts"), "a card the user removed isn't added back on its own");
+
+  // Undo restores the previous dashboard.
+  await agent.resolveAction(c, t3.assistant.actions[0].id, "undo");
+  assert.deepEqual((await cardsSvc.getCards(c)).show, ["next_shift", "paychecks", "week", "payoff", "debts"]);
+
+  const t4 = await agent.runTurn(c, { text: "that's everything" }, { provider: scripted([() => call("complete_setup", {}), () => say("You're set.")]) });
+  assert.equal(t4.assistant.actions[0].display?.kind, "setup_done");
+  c = await ctxForUser(C);
+  assert.ok(c.prefs.onboarded_at, "setup finished");
+  await sql`delete from app_users where id = ${C}`;
+});
+
+test("AI-built dashboard: existing data gets sensible cards; provider outage stores nothing so Retry is clean", { skip }, async () => {
+  const cards = (await dash.getDashboard(a)).cards;
+  assert.ok(cards.includes("next_shift") && cards.includes("paychecks"), "derived from jobs");
+  const { ProviderUnavailable } = await import("../../src/lib/ai/provider");
+  const before = await sql<{ n: number }[]>`select count(*)::int as n from ai_messages where user_id = ${A}`;
+  const t = await agent.runTurn(a, { text: "hey" }, { provider: { name: "down", chat: async () => { throw new ProviderUnavailable("Gemini is overloaded right now. Give it a minute and tap Retry."); } } });
+  assert.equal(t.retryable, true);
+  assert.equal(t.assistant.error, true);
+  assert.match(t.assistant.content, /overloaded/);
+  const after = await sql<{ n: number }[]>`select count(*)::int as n from ai_messages where user_id = ${A}`;
+  assert.equal(after[0].n, before[0].n, "nothing stored on failure");
 });
 
 test("cleanup: deleting the account removes every row", { skip }, async () => {

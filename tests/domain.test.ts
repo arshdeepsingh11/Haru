@@ -293,3 +293,33 @@ test("payoff plan: warns when the schedule doesn't cover bills", () => {
   assert.equal(plan.items[0].finishDate, "2028-11-22"); // minimum payments alone, no extra
   assert.equal(daysCloser(plan, 10000), null);
 });
+
+test("schedule photo: model JSON becomes clean shifts matched to jobs", async () => {
+  const { parseScan } = await import("../src/lib/server/services/scan");
+  const jobs = [{ id: "j1", name: "BioARO (Developer)", employer: "BioARO" }, { id: "j2", name: "Bean Cafe", employer: "Bean Cafe" }];
+  const r = parseScan(
+    "```json\n" + JSON.stringify({ employer: "Bean Cafe", shifts: [
+      { date: "2026-10-26", start: "9:00", end: "15:30", job: null },
+      { date: "2026-10-27", start: "16:00", end: "23:00", break_minutes: 30, job: "bioaro" },
+      { date: "2026-10-28", start: "25:00", end: "26:00" },
+      { date: "1999-01-01", start: "09:00", end: "10:00" },
+      { date: "Monday", start: "09:00", end: "10:00" },
+    ], notes: ["Assumed 2026"] }) + "\n```",
+    jobs,
+    "2026-10-23",
+  );
+  assert.equal(r.shifts.length, 2, "invalid times, far dates and non-dates are dropped");
+  assert.deepEqual(r.shifts[0], { date: "2026-10-26", start: "09:00", end: "15:30", break_minutes: 0, job_id: "j2", job_name: "Bean Cafe" });
+  assert.equal(r.shifts[1].job_id, "j1");
+  assert.equal(r.shifts[1].break_minutes, 30);
+  assert.deepEqual(r.notes, ["Assumed 2026"]);
+  assert.throws(() => parseScan("not json", jobs, "2026-10-23"), /couldn't read a schedule/);
+});
+
+test("dashboard cards: placed in natural order without disturbing the user's order", async () => {
+  const { placeCards, normalizeCards } = await import("../src/lib/dashboard-registry");
+  assert.deepEqual(placeCards([], ["week", "next_shift", "paychecks"]), ["next_shift", "paychecks", "week"]);
+  assert.deepEqual(placeCards(["bills", "next_shift"], ["payoff"]), ["payoff", "bills", "next_shift"]);
+  assert.deepEqual(normalizeCards({ show: ["week", "nope", "week"], removed: "x" }), { show: ["week"], removed: [] });
+  assert.equal(normalizeCards(null), null);
+});
