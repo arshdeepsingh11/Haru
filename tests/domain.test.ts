@@ -187,8 +187,8 @@ test("reminder planner: deterministic keys, lead times, window", () => {
     now,
     tz: TZ,
     currency: "CAD",
-    prefs: { categories: {}, shiftLeadMinutes: 30, logHoursTime: "21:00", billLeadDays: 1, billNotifyTime: "09:00", paydayNotifyTime: "09:00" },
-    shifts: [{ id: "s1", job_name: "Security", work_date: "2026-10-22", starts_at: new Date("2026-10-22T22:00:00Z"), ends_at: new Date("2026-10-23T05:00:00Z"), status: "scheduled" }],
+    prefs: { categories: {}, shiftLeadMinutes: 60, logHoursTime: "21:00", billLeadDays: 1, billNotifyTime: "09:00", paydayNotifyTime: "09:00" },
+    shifts: [{ id: "s1", job_name: "Security", work_date: "2026-10-22", starts_at: new Date("2026-10-22T22:00:00Z"), ends_at: new Date("2026-10-23T05:00:00Z"), status: "scheduled", take_home_cents: 12350, pay_date: "2026-10-30" }],
     bills: [{ id: "b1", name: "Phone", amount_cents: 11500, next_due_date: "2026-10-24" }],
     paydays: [{ job_id: "j1", job_name: "Security", pay_date: "2026-10-23", expected_gross_cents: 13000 }],
     opportunities: [],
@@ -196,10 +196,20 @@ test("reminder planner: deterministic keys, lead times, window", () => {
   const a = planAutoReminders(input);
   const b = planAutoReminders(input);
   assert.deepEqual(a.map((r) => r.dedupeKey), b.map((r) => r.dedupeKey));
+  // One hour before the 16:00 shift, with the money and one-tap answers
   const shift = a.find((r) => r.category === "shift")!;
-  assert.equal(shift.fireAt.toISOString(), "2026-10-22T21:30:00.000Z");
-  const log = a.find((r) => r.category === "log_hours")!;
-  assert.equal(log.fireAt.toISOString(), "2026-10-23T05:15:00.000Z"); // after 23:00 end, not 21:00
+  assert.equal(shift.fireAt.toISOString(), "2026-10-22T21:00:00.000Z");
+  assert.match(shift.title, /in 1 hour \(16:00\)/);
+  assert.match(shift.body, /\$123\.50 after tax.*Oct 30 paycheck/);
+  assert.deepEqual(shift.payload?.actions?.map((x) => x.action), ["going", "skip"]);
+  // Ten minutes after the 23:00 end: "Did you finish?"
+  const out = a.find((r) => r.category === "checkout")!;
+  assert.equal(out.fireAt.toISOString(), "2026-10-23T05:10:00.000Z");
+  assert.deepEqual(out.payload?.actions?.map((x) => x.action), ["full", "partial"]);
+  assert.equal(a.some((r) => r.category === "log_hours"), false);
+  // Saying "can't go" stops both reminders
+  const skipped = planAutoReminders({ ...input, shifts: [{ ...input.shifts[0], attendance: "not_going" }] });
+  assert.equal(skipped.some((r) => r.category === "shift" || r.category === "checkout"), false);
   const bill = a.find((r) => r.category === "bill")!;
   assert.equal(localTime(bill.fireAt, TZ), "09:00");
   assert.equal(localDate(bill.fireAt, TZ), "2026-10-23");
@@ -228,4 +238,58 @@ test("observations need repeated evidence", () => {
     "CAD",
   );
   assert.match(saving!.statement, /\$200\.00/);
+});
+
+test("your pay calendar: periods start 10th & 25th, paid 15th & 30th", () => {
+  const rule: PayRule = { frequency: "semimonthly", periodStartDays: [10, 25], payDays: [15, 30], paydayOffsetDays: 0, weekendRule: "none" };
+  // Working on Oct 17 → period Oct 10–24 → paid Oct 30
+  assert.deepEqual(periodWithPayDate(rule, "2026-10-17"), { start: "2026-10-10", end: "2026-10-24", payDate: "2026-10-30" });
+  // Working on Oct 27 → period Oct 25–Nov 9 → paid Nov 15
+  assert.deepEqual(periodWithPayDate(rule, "2026-10-27"), { start: "2026-10-25", end: "2026-11-09", payDate: "2026-11-15" });
+  // Working on Nov 3 (before the 10th) → still the Oct 25 period
+  assert.deepEqual(periodWithPayDate(rule, "2026-11-03"), { start: "2026-10-25", end: "2026-11-09", payDate: "2026-11-15" });
+  // February: "30th" pay day clamps to Feb 28
+  assert.equal(periodWithPayDate(rule, "2027-02-12").payDate, "2027-02-28");
+  // Next payday from today (Oct 22) is Oct 30
+  assert.equal(nextPayPeriod(rule, "2026-10-22").payDate, "2026-10-30");
+});
+
+test("standard twice-a-month: 1st–15th paid 15th, 16th–end paid last day", () => {
+  const rule: PayRule = { frequency: "semimonthly", periodStartDays: [1, 16], payDays: [15, 31], paydayOffsetDays: 0, weekendRule: "none" };
+  assert.deepEqual(periodWithPayDate(rule, "2026-10-05"), { start: "2026-10-01", end: "2026-10-15", payDate: "2026-10-15" });
+  assert.deepEqual(periodWithPayDate(rule, "2026-10-20"), { start: "2026-10-16", end: "2026-10-31", payDate: "2026-10-31" });
+  assert.deepEqual(periodWithPayDate(rule, "2026-11-20"), { start: "2026-11-16", end: "2026-11-30", payDate: "2026-11-30" });
+});
+
+import { buildPayoffPlan, daysCloser } from "../src/lib/domain/payoff";
+
+test("payoff plan: highest interest first, minimums roll over, goals after", () => {
+  const plan = buildPayoffPlan({
+    today: "2026-10-22",
+    monthlyTakeHomeCents: 250000, // $2,500 from the schedule after tax
+    monthlyBillsCents: 150000, // $1,500 rent, phone, groceries...
+    debts: [
+      { id: "loan", name: "Loan from Sam", balanceCents: 640000, aprPercent: null, minimumCents: null },
+      { id: "visa", name: "Visa", balanceCents: 200000, aprPercent: 22.99, minimumCents: 6000 },
+    ],
+    goals: [{ id: "ef", name: "Emergency fund", targetCents: 100000, savedCents: 0, targetDate: null }],
+  });
+  assert.equal(plan.focus?.name, "Visa");
+  assert.match(plan.focus!.reason, /22\.99%/);
+  assert.equal(plan.surplusCents, 250000 - 150000 - 6000);
+  // Visa (~$2,000 at 23%) cleared in month 3; then everything to the loan
+  assert.equal(plan.items[0].months, 3);
+  assert.ok(plan.items[1].months! > 3);
+  assert.equal(plan.items[2].kind, "goal");
+  assert.ok(plan.items[2].months! > plan.items[1].months!);
+  assert.ok(plan.debtFreeDate);
+  // A $123.50 shift moves the focus about 4 days closer at $940/month free
+  assert.equal(daysCloser(plan, 12350), 4);
+});
+
+test("payoff plan: warns when the schedule doesn't cover bills", () => {
+  const plan = buildPayoffPlan({ today: "2026-10-22", monthlyTakeHomeCents: 100000, monthlyBillsCents: 120000, debts: [{ id: "c", name: "Card", balanceCents: 50000, aprPercent: 20, minimumCents: 2500 }], goals: [] });
+  assert.ok(plan.warnings[0].includes("don't cover"));
+  assert.equal(plan.items[0].finishDate, "2028-11-22"); // minimum payments alone, no extra
+  assert.equal(daysCloser(plan, 10000), null);
 });

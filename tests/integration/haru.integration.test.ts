@@ -26,6 +26,8 @@ const obs = await import("../../src/lib/server/services/observations");
 const sched = await import("../../src/lib/server/notifications/scheduler");
 const { applyUndo } = await import("../../src/lib/server/undo");
 const agent = await import("../../src/lib/ai/agent");
+const loop = await import("../../src/lib/server/services/shiftloop");
+const coach = await import("../../src/lib/server/services/coach");
 const { AppError } = await import("../../src/lib/server/errors");
 const { addDays, weekdayOf } = await import("../../src/lib/domain/time");
 import type { ChatProvider, ChatResponse } from "../../src/lib/ai/provider";
@@ -377,6 +379,115 @@ test("regular schedule materialises once", { skip }, async () => {
   const n2 = await shifts.materializeSchedules(a, 7);
   assert.equal(n1, 1);
   assert.equal(n2, 0);
+});
+
+test("shift loop: your pay calendar, going/missed, checkout with fewer hours, coach numbers", { skip }, async () => {
+  const c = await makeUser(randomUUID());
+  const job = (await jobs.createJob(c, { employer: "Northgate Security", hourly_rate: 20, pay_frequency: "semimonthly", period_start_days: [10, 25], pay_days: [15, 30] }, "user")).data as { id: string };
+  const tomorrow = addDays(c.today, 1);
+  const s1 = (await shifts.createShift(c, { job_id: job.id, date: tomorrow, status: "scheduled", start: "16:00", end: "23:00", break_minutes: 30 }, "user")).data as { id: string; gross_cents: number };
+  assert.equal(s1.gross_cents, 13000);
+
+  // Coach: next shift = $123.50 after 5% tax, lands in the paycheck for its period
+  let co = await coach.getCoach(c);
+  assert.equal(co.nextShift?.id, s1.id);
+  assert.equal(co.nextShift?.takeHomeCents, 12350);
+  const pc = await loop.paycheckContext(c, job.id, tomorrow);
+  assert.equal(co.nextShift?.payDate, pc.payDate);
+  assert.ok(["15", "30", "28", "29"].includes(pc.payDate!.slice(8)), `pay day ${pc.payDate}`);
+
+  // "I'm going"
+  const g = await loop.setAttendance(c, s1.id, true, "user");
+  assert.match(g.summary, /\$123\.50 after tax/);
+  // Can't check out a future shift
+  await assert.rejects(loop.checkoutShift(c, s1.id, { full: true }, "user"), /hasn't happened/);
+
+  // A shift that ended yesterday → appears as waiting for check-out → worked 5 of 6.5 hours
+  const y = addDays(c.today, -1);
+  const s2 = (await shifts.createShift(c, { job_id: job.id, date: y, status: "scheduled", start: "09:00", end: "16:00", break_minutes: 30 }, "user")).data as { id: string };
+  co = await coach.getCoach(c);
+  assert.ok(co.checkouts.some((x) => x.id === s2.id));
+  const out = await loop.checkoutShift(c, s2.id, { hours: 5 }, "user");
+  assert.match(out.summary, /Logged 5 h.*\+\$95\.00 after tax \(\$100\.00 gross\)/);
+  assert.match(out.summary, /paycheck is now about/);
+  await assert.rejects(loop.checkoutShift(c, s2.id, { full: true }, "user"), /already logged/);
+
+  // "Can't make it" → missed, money missed shows in stats
+  const s3 = (await shifts.createShift(c, { job_id: job.id, date: y, status: "scheduled", start: "18:00", end: "22:00" }, "user")).data as { id: string };
+  const miss = await loop.setAttendance(c, s3.id, false, "user");
+  assert.match(miss.summary, /\$76\.00 you won't earn/);
+  const st = await coach.attendanceStats(c);
+  assert.equal(st.workedShifts, 1);
+  assert.equal(st.missedShifts, 1);
+  assert.equal(st.missedTakeHomeCents, 7600);
+  assert.equal(st.attendanceRate, 0.5);
+  const [ev] = await sql<{ n: number }[]>`select count(*)::int as n from shift_events where user_id = ${c.userId}`;
+  assert.equal(ev.n, 3, "going, completed_partial, not_going recorded for learning");
+
+  // Payoff plan with a card and the schedule
+  await jobs.updateJob(c, { job_id: job.id, regular_schedule: [{ weekday: 1, start: "16:00", end: "23:00", break_minutes: 30 }, { weekday: 3, start: "16:00", end: "23:00", break_minutes: 30 }] }, "user");
+  await fin.createBill(c, { name: "Phone", amount: 115, due_date: addDays(c.today, 3), recurrence: "monthly" }, "user");
+  await fin.createDebt(c, { name: "Visa", balance: 2000, interest_rate_percent: 22.99, minimum_payment: 60 }, "user");
+  const plan = await coach.getPayoffPlan(c);
+  assert.equal(plan.monthlyTakeHomeCents, Math.round(26000 * 52 / 12) - Math.round(Math.round(26000 * 52 / 12) * 0.05));
+  assert.equal(plan.focus?.name, "Visa");
+  assert.ok(plan.focus?.finishDate);
+
+  // Undo of a pay-calendar change restores the integer arrays
+  const ch = await jobs.updateJob(c, { job_id: job.id, pay_days: [1, 16] }, "user");
+  await applyUndo(sql, c.userId, ch.undo!);
+  const [jr] = await sql<{ pay_days: number[] }[]>`select pay_days from jobs where id = ${job.id}`;
+  assert.deepEqual(jr.pay_days, [15, 30]);
+  await sql`delete from app_users where id = ${c.userId}`;
+});
+
+test("AI: going/check-out and plan tools work through the agent", { skip }, async () => {
+  const c = await makeUser(randomUUID());
+  const job = (await jobs.createJob(c, { employer: "Bean Cafe", hourly_rate: 18, pay_frequency: "weekly", period_anchor_date: addDays(c.today, -3), payday_offset_days: 5 }, "user")).data as { id: string };
+  const s = (await shifts.createShift(c, { job_id: job.id, date: addDays(c.today, -1), status: "scheduled", start: "10:00", end: "14:00" }, "user")).data as { id: string };
+  const t = await agent.runTurn(c, { text: "worked my full shift yesterday" }, { provider: scripted([() => call("checkout_shift", { shift_id: s.id, full: true }), () => say("Logged!")]) });
+  assert.equal(t.changed, true);
+  assert.equal(t.assistant.actions[0].status, "completed");
+  assert.match(t.assistant.actions[0].summary!, /Logged 4 h/);
+  const p = await agent.runTurn(c, { text: "what should I pay first" }, { provider: scripted([() => call("get_payoff_plan", {}), (msgs) => {
+    const r = JSON.parse((msgs[msgs.length - 1].content[0] as { content: string }).content);
+    assert.equal(r.ok, true);
+    assert.ok("free_each_month" in r.data);
+    return say("ok");
+  }]) });
+  assert.equal(p.changed, false);
+  await sql`delete from app_users where id = ${c.userId}`;
+});
+
+test("notifications: shift reminder carries earnings and buttons; can't-go cancels it", { skip }, async () => {
+  globalThis.__pushCalls = [];
+  const c = await makeUser(randomUUID());
+  await sql`update user_preferences set notify_enabled = true where user_id = ${c.userId}`;
+  await sql`insert into push_subscriptions (user_id, endpoint, p256dh, auth) values (${c.userId}, ${`https://push.example/ok-${c.userId}`}, 'p256dh-key-xxxxx', 'auth-xxxx')`;
+  const job = (await jobs.createJob(c, { employer: "Northgate", hourly_rate: 20, pay_frequency: "semimonthly", period_start_days: [10, 25], pay_days: [15, 30] }, "user")).data as { id: string };
+  // A shift starting in 55 minutes → its 60-minute reminder became due 5 minutes ago
+  const start = new Date(Date.now() + 55 * 60000);
+  const { localDate, localTime } = await import("../../src/lib/domain/time");
+  const d = localDate(start, c.tz);
+  const st = localTime(start, c.tz);
+  const endH = (Number(st.slice(0, 2)) + 4) % 24;
+  const s = (await shifts.createShift(c, { job_id: job.id, date: d, status: "scheduled", start: st, end: `${String(endH).padStart(2, "0")}:${st.slice(3)}` }, "user")).data as { id: string };
+  await sched.runScheduler();
+  const sent = globalThis.__pushCalls.filter((x) => x.endpoint.includes(c.userId)) as unknown as { payload: { title: string; body: string; actions: { action: string }[]; shiftId: string; kind: string } }[];
+  const pre = sent.find((x) => x.payload.kind === "shift");
+  assert.ok(pre, "pre-shift reminder sent");
+  assert.match(pre!.payload.body, /\$76\.00 after tax/);
+  assert.deepEqual(pre!.payload.actions.map((a) => a.action), ["going", "skip"]);
+  assert.equal(pre!.payload.shiftId, s.id);
+  // The after-shift reminder is planned (fires 10 min after the end)
+  const [co] = await sql<{ n: number }[]>`select count(*)::int as n from reminders where user_id = ${c.userId} and category = 'checkout' and status = 'pending'`;
+  assert.equal(co.n, 1);
+  // Saying "can't go" retires the pending check-out reminder at the next run
+  await loop.setAttendance(c, s.id, false, "user");
+  await sched.runScheduler();
+  const [after] = await sql<{ n: number }[]>`select count(*)::int as n from reminders where user_id = ${c.userId} and category = 'checkout' and status = 'pending'`;
+  assert.equal(after.n, 0);
+  await sql`delete from app_users where id = ${c.userId}`;
 });
 
 test("cleanup: deleting the account removes every row", { skip }, async () => {
