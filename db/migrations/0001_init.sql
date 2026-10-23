@@ -270,3 +270,17 @@ create table savings_goals (
   created_at timestamptz not null default now(),
   unique (id, user_id)
 );
+
+-- Contributions ALLOCATE money already in your accounts to a goal; they are
+-- not spending and do not change total cash.
+create table goal_contributions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null,
+  goal_id uuid not null,
+  amount_cents bigint not null check (amount_cents <> 0),
+  contributed_on date not null,
+  note text,
+  voided_at timestamptz,
+  created_at timestamptz not null default now(),
+  foreign key (goal_id, user_id) references savings_goals(id, user_id) on delete cascade
+);
