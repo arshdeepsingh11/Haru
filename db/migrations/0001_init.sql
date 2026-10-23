@@ -244,3 +244,17 @@ create index tx_user_date_idx on transactions(user_id, occurred_on);
 -- A paycheck or a one-time job payment can be deposited at most once (no double counting).
 create unique index tx_paycheck_once on transactions(paycheck_id) where paycheck_id is not null and voided_at is null;
 create unique index tx_opportunity_once on transactions(opportunity_id) where opportunity_id is not null and voided_at is null;
+
+create table bill_payments (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null,
+  bill_id uuid not null,
+  due_date date not null,
+  paid_on date not null,
+  amount_cents bigint not null check (amount_cents > 0),
+  transaction_id uuid,
+  created_at timestamptz not null default now(),
+  foreign key (bill_id, user_id) references bills(id, user_id) on delete cascade,
+  foreign key (transaction_id, user_id) references transactions(id, user_id),
+  unique (bill_id, due_date)            -- one payment per bill occurrence
+);
