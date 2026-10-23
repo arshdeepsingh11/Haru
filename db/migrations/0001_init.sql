@@ -313,3 +313,16 @@ create table reminders (
 );
 create index reminders_due_idx on reminders((coalesce(next_attempt_at, fire_at))) where status = 'pending';
 create index reminders_user_idx on reminders(user_id, fire_at desc);
+
+create table push_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references app_users(id) on delete cascade,
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  user_agent text,
+  failure_count integer not null default 0,
+  last_success_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index push_subs_user_idx on push_subscriptions(user_id);
