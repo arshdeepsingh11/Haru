@@ -21,7 +21,8 @@ export interface ShiftRow {
   paid_minutes: number;
   rate_cents: number;
   gross_cents: number;
-  status: "scheduled" | "completed" | "cancelled";
+  status: "scheduled" | "completed" | "cancelled" | "missed";
+  attendance: "pending" | "going" | "not_going";
   source: string;
   paycheck_id: string | null;
   notes: string | null;
@@ -84,7 +85,7 @@ export async function createShift(ctx: Ctx, input: ShiftCreate, actor: Actor): P
 
     const sameDay = await tx<ShiftRow[]>`
       select s.*, ${job.employer} as job_name from shifts s
-      where s.user_id = ${ctx.userId} and s.job_id = ${job.id} and s.work_date = ${input.date} and s.status <> 'cancelled'
+      where s.user_id = ${ctx.userId} and s.job_id = ${job.id} and s.work_date = ${input.date} and s.status not in ('cancelled', 'missed')
       order by s.starts_at nulls last`;
 
     if (status === "completed") {

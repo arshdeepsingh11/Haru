@@ -30,7 +30,9 @@ export const JobCreate = z.object({
   expected_weekly_hours: z.number().min(0).max(168).optional(),
   pay_frequency: zPayFrequency.optional(),
   period_anchor_date: zDate.optional().describe("First day of any one pay period (required for weekly/biweekly)"),
-  semimonthly_split_day: z.number().int().min(1).max(27).optional().describe("Semimonthly: first period ends on this day (default 15)"),
+  semimonthly_split_day: z.number().int().min(1).max(27).optional().describe("Legacy: prefer period_start_days"),
+  period_start_days: z.array(z.number().int().min(1).max(28)).min(1).max(2).optional().describe("Twice a month: days pay periods start, e.g. [10, 25]. Monthly: [1]"),
+  pay_days: z.array(z.number().int().min(1).max(31)).min(1).max(2).optional().describe("Twice a month / monthly: calendar pay days, e.g. [15, 30]; 31 = last day of month"),
   payday_offset_days: z.number().int().min(0).max(31).optional().describe("Days after the period ends that pay arrives"),
   payday_weekend_rule: zWeekendRule.optional(),
   deduction_percent: z.number().min(0).max(99).optional().describe("Known payroll deductions as % of gross, only if the user states it"),
@@ -63,7 +65,7 @@ export const ShiftUpdate = z.object({
   end: zTime.optional(),
   break_minutes: z.number().int().min(0).max(600).optional(),
   hours: z.number().gt(0).max(24).optional(),
-  status: z.enum(["completed", "scheduled", "cancelled"]).optional(),
+  status: z.enum(["completed", "scheduled", "cancelled", "missed"]).optional(),
   hourly_rate: zPositiveMoney.optional().describe("Only to correct the rate recorded for THIS shift"),
   notes: zNotes.optional(),
 });
@@ -217,4 +219,16 @@ export const RangeInput = z.object({
   period: z.enum(["today", "this_week", "last_week", "this_month", "last_month", "next_30_days", "custom"]),
   start: zDate.optional(),
   end: zDate.optional(),
+});
+
+export const ShiftAttendance = z.object({
+  shift_id: zId,
+  going: z.boolean().describe("true = the user will go to this shift; false = they can't make it"),
+});
+
+export const ShiftCheckout = z.object({
+  shift_id: zId,
+  full: z.boolean().optional().describe("Worked the whole scheduled shift"),
+  hours: z.number().gt(0).max(24).optional().describe("Paid hours actually worked, when not the full shift"),
+  missed: z.boolean().optional().describe("Did not work it at all"),
 });

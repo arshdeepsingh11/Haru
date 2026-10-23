@@ -37,7 +37,7 @@ async function receivedStarts(ctx: Ctx, jobId: string, q: Q) {
 async function periodShifts(ctx: Ctx, jobId: string, p: { start: string; end: string }, q: Q) {
   return q<{ status: "scheduled" | "completed" | "cancelled"; gross_cents: number; paid_minutes: number }[]>`
     select status, gross_cents, paid_minutes from shifts
-    where user_id = ${ctx.userId} and job_id = ${jobId} and work_date between ${p.start} and ${p.end} and status <> 'cancelled'`;
+    where user_id = ${ctx.userId} and job_id = ${jobId} and work_date between ${p.start} and ${p.end} and status in ('completed','scheduled')`;
 }
 
 /** Next unpaid payday for one job, using its saved payroll rules. */

@@ -43,6 +43,13 @@ export type UndoOp =
   | { op: "layout"; layout: unknown }
   | { op: "prefs"; values: Record<string, unknown> };
 
+/** Arrays of numbers are Postgres arrays (pay days); other objects/arrays are JSON columns. */
+function encodeValue(q: Q, v: unknown): unknown {
+  if (Array.isArray(v) && v.length > 0 && v.every((x) => typeof x === "number")) return q.array(v as number[]);
+  if (v !== null && typeof v === "object") return q.json(v as never);
+  return v;
+}
+
 export async function applyUndo(q: Q, userId: string, ops: UndoOp[]) {
   // Reverse order: last change undone first.
   for (const o of [...ops].reverse()) {
@@ -63,14 +70,14 @@ export async function applyUndo(q: Q, userId: string, ops: UndoOp[]) {
         {
           // JSON columns were snapshotted as objects/arrays; send them as json.
           const values: Record<string, unknown> = {};
-          for (const [k, v] of Object.entries(o.values)) values[k] = v !== null && typeof v === "object" ? q.json(v as never) : v;
+          for (const [k, v] of Object.entries(o.values)) values[k] = encodeValue(q, v);
           await q`update ${q(o.table)} set ${q(values as Record<string, never>)} where id = ${o.id} and user_id = ${userId}`;
         }
         break;
       case "insert": {
         if (!TABLES.has(o.table)) throw new AppError("Unsupported undo");
         const values: Record<string, unknown> = {};
-        for (const [k, v] of Object.entries(o.values)) values[k] = v !== null && typeof v === "object" ? q.json(v as never) : v;
+        for (const [k, v] of Object.entries(o.values)) values[k] = encodeValue(q, v);
         values.user_id = userId;
         await q`insert into ${q(o.table)} ${q(values as Record<string, never>)}`;
         break;
@@ -87,7 +94,7 @@ export async function applyUndo(q: Q, userId: string, ops: UndoOp[]) {
       case "prefs": {
         const allowed = new Set(["display_name", "currency", "timezone", "week_starts_on", "reserve_percent", "notify_categories", "shift_lead_minutes", "log_hours_time", "bill_lead_days", "bill_notify_time", "payday_notify_time"]);
         const values: Record<string, unknown> = {};
-        for (const [k, v] of Object.entries(o.values)) if (allowed.has(k)) values[k] = v !== null && typeof v === "object" ? q.json(v as never) : v;
+        for (const [k, v] of Object.entries(o.values)) if (allowed.has(k)) values[k] = encodeValue(q, v);
         if (Object.keys(values).length) await q`update user_preferences set ${q(values as Record<string, never>)}, updated_at = now() where user_id = ${userId}`;
         break;
       }

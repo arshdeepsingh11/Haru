@@ -19,6 +19,8 @@ export interface JobRow {
   pay_frequency: PayRule["frequency"] | null;
   period_anchor_date: string | null;
   semimonthly_split_day: number;
+  period_start_days: number[] | null;
+  pay_days: number[] | null;
   payday_offset_days: number;
   payday_weekend_rule: PayRule["weekendRule"];
   deduction_percent: number | null;
@@ -34,12 +36,14 @@ export interface ServiceResult<T = unknown> {
   undo?: UndoOp[];
 }
 
-export function payRuleOf(j: Pick<JobRow, "pay_frequency" | "period_anchor_date" | "semimonthly_split_day" | "payday_offset_days" | "payday_weekend_rule">): PayRule | null {
+export function payRuleOf(j: Pick<JobRow, "pay_frequency" | "period_anchor_date" | "semimonthly_split_day" | "payday_offset_days" | "payday_weekend_rule"> & Partial<Pick<JobRow, "period_start_days" | "pay_days">>): PayRule | null {
   if (!j.pay_frequency) return null;
   return {
     frequency: j.pay_frequency,
     anchorDate: j.period_anchor_date,
     splitDay: j.semimonthly_split_day,
+    periodStartDays: j.period_start_days ?? null,
+    payDays: j.pay_days ?? null,
     paydayOffsetDays: j.payday_offset_days,
     weekendRule: j.payday_weekend_rule,
   };
@@ -93,11 +97,12 @@ export async function createJob(ctx: Ctx, input: JobCreate, actor: Actor): Promi
   return sql.begin(async (tx) => {
     const [job] = await tx<{ id: string }[]>`
       insert into jobs (user_id, employer, title, currency, status, start_date, expected_weekly_minutes, pay_frequency,
-        period_anchor_date, semimonthly_split_day, payday_offset_days, payday_weekend_rule, deduction_percent,
+        period_anchor_date, semimonthly_split_day, period_start_days, pay_days, payday_offset_days, payday_weekend_rule, deduction_percent,
         deduction_fixed_cents, regular_schedule, notes)
       values (${ctx.userId}, ${input.employer}, ${input.title ?? null}, ${ctx.currency}, ${input.status ?? "active"},
         ${input.start_date ?? null}, ${input.expected_weekly_hours != null ? Math.round(input.expected_weekly_hours * 60) : null},
         ${input.pay_frequency ?? null}, ${input.period_anchor_date ?? null}, ${input.semimonthly_split_day ?? 15},
+        ${input.period_start_days ? tx.array(input.period_start_days) : null}, ${input.pay_days ? tx.array(input.pay_days) : null},
         ${input.payday_offset_days ?? 0}, ${input.payday_weekend_rule ?? "none"}, ${input.deduction_percent ?? null},
         ${input.deduction_fixed != null ? toCents(input.deduction_fixed) : null}, ${tx.json((input.regular_schedule ?? []) as never)},
         ${input.notes ?? null})
@@ -125,6 +130,8 @@ const JOB_COLS = [
   "pay_frequency",
   "period_anchor_date",
   "semimonthly_split_day",
+  "period_start_days",
+  "pay_days",
   "payday_offset_days",
   "payday_weekend_rule",
   "deduction_percent",
@@ -147,6 +154,8 @@ export async function updateJob(ctx: Ctx, input: JobUpdate, actor: Actor): Promi
     if (input.pay_frequency !== undefined) patch.pay_frequency = input.pay_frequency;
     if (input.period_anchor_date !== undefined) patch.period_anchor_date = input.period_anchor_date;
     if (input.semimonthly_split_day !== undefined) patch.semimonthly_split_day = input.semimonthly_split_day;
+    if (input.period_start_days !== undefined) patch.period_start_days = tx.array(input.period_start_days);
+    if (input.pay_days !== undefined) patch.pay_days = tx.array(input.pay_days);
     if (input.payday_offset_days !== undefined) patch.payday_offset_days = input.payday_offset_days;
     if (input.payday_weekend_rule !== undefined) patch.payday_weekend_rule = input.payday_weekend_rule;
     if (input.deduction_percent !== undefined) patch.deduction_percent = input.deduction_percent;

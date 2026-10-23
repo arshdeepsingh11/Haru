@@ -1,7 +1,6 @@
 import { percentOf, type Cents } from "./money";
 import {
   addDays,
-  daysInMonth,
   diffDays,
   endOfMonth,
   type ISODate,
@@ -17,8 +16,10 @@ export type WeekendRule = "none" | "previous_business_day" | "next_business_day"
 export interface PayRule {
   frequency: PayFrequency;
   anchorDate?: ISODate | null; // first day of any known period (weekly/biweekly)
-  splitDay?: number; // semimonthly: first period is 1..splitDay
-  paydayOffsetDays: number; // payday = period end + offset
+  splitDay?: number; // semimonthly (legacy): first period is 1..splitDay
+  periodStartDays?: number[] | null; // semimonthly: e.g. [10, 25]; monthly: e.g. [1]
+  payDays?: number[] | null; // calendar pay days, e.g. [15, 30]; 31 = last day of month
+  paydayOffsetDays: number; // payday = period end + offset (when payDays is not set)
   weekendRule: WeekendRule;
 }
 
@@ -46,15 +47,30 @@ export function periodContaining(rule: PayRule, date: ISODate): { start: ISODate
       return { start, end: addDays(start, len - 1) };
     }
     case "semimonthly": {
-      const split = rule.splitDay ?? 15;
-      const { year, month, day } = splitDate(date);
-      return day <= split
-        ? { start: makeDate(year, month, 1), end: makeDate(year, month, split) }
-        : { start: makeDate(year, month, split + 1), end: makeDate(year, month, daysInMonth(year, month)) };
+      const starts = sortedStarts(rule.periodStartDays, [1, (rule.splitDay ?? 15) + 1]);
+      return calendarPeriod(starts, date);
     }
     case "monthly":
-      return { start: startOfMonth(date), end: endOfMonth(date) };
+      return rule.periodStartDays?.length ? calendarPeriod([rule.periodStartDays[0]], date) : { start: startOfMonth(date), end: endOfMonth(date) };
   }
+}
+
+function sortedStarts(days: number[] | null | undefined, fallback: number[]): number[] {
+  const d = (days?.length ? days : fallback).map((x) => Math.min(Math.max(1, x), 28));
+  return [...new Set(d)].sort((a, b) => a - b);
+}
+
+/** Period containing `date` when periods begin on fixed days of each month (e.g. the 10th and 25th). */
+function calendarPeriod(starts: number[], date: ISODate): { start: ISODate; end: ISODate } {
+  const { year, month } = splitDate(date);
+  // Candidate starts: last month's, this month's and next month's start days.
+  const all: ISODate[] = [];
+  for (const m of [month - 1, month, month + 1]) for (const s of starts) all.push(makeDate(year, m, s));
+  all.sort();
+  let start = all[0];
+  for (const c of all) if (c <= date) start = c;
+  const next = all.find((c) => c > start)!;
+  return { start, end: addDays(next, -1) };
 }
 
 export function adjustForWeekend(date: ISODate, rule: WeekendRule): ISODate {
@@ -66,6 +82,14 @@ export function adjustForWeekend(date: ISODate, rule: WeekendRule): ISODate {
 }
 
 export function payDateFor(rule: PayRule, period: { end: ISODate }): ISODate {
+  if (rule.payDays?.length && rule.frequency !== "weekly" && rule.frequency !== "biweekly") {
+    // First configured pay day on or after the period ends (31 means the month's last day).
+    const { year, month } = splitDate(period.end);
+    const candidates: ISODate[] = [];
+    for (const m of [month, month + 1, month + 2]) for (const d of rule.payDays) candidates.push(makeDate(year, m, d));
+    const pay = candidates.sort().find((c) => c >= period.end)!;
+    return adjustForWeekend(pay, rule.weekendRule);
+  }
   return adjustForWeekend(addDays(period.end, rule.paydayOffsetDays), rule.weekendRule);
 }
 
