@@ -104,7 +104,7 @@ test("gemini: quota on one model moves on; all busy says so plainly", async () =
 test("gemini: thinking is kept short per model, and dropped if a model rejects it", async () => {
   const { thinkingFor } = await import("../src/lib/ai/gemini");
   assert.deepEqual(thinkingFor("gemini-3.8-flash"), { thinkingLevel: "low" });
-  assert.deepEqual(thinkingFor("gemini-3.5-flash-lite"), { thinkingLevel: "minimal" });
+  assert.deepEqual(thinkingFor("gemini-3.5-flash-lite"), { thinkingLevel: "low" });
   assert.deepEqual(thinkingFor("gemini-2.5-flash"), { thinkingBudget: 512 });
   const seen: { url: string; body: any; headers: any }[] = [];
   const p = new GeminiProvider("k", "gemini-3.8-flash", fakeFetch([{ status: 400, body: JSON.stringify({ error: { message: "Unknown name thinkingLevel" } }) }, ok], seen), { retryDelaysMs: [0] });

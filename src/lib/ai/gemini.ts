@@ -73,7 +73,7 @@ export function thinkingFor(model: string): Record<string, unknown> {
   const forced = process.env.HARU_AI_THINKING?.trim();
   if (/^gemini-2\.5/.test(model)) return { thinkingBudget: /lite/.test(model) ? 0 : 512 };
   if (forced) return { thinkingLevel: forced };
-  if (/^gemini-3\.(5|6)/.test(model)) return { thinkingLevel: "minimal" };
+  // "minimal" made 3.5/3.6 skip details in long messages (missed schedules); "low" is still fast.
   return { thinkingLevel: "low" };
 }
 const RETRYABLE = new Set([500, 502, 503, 504]);

@@ -73,7 +73,7 @@ export async function buildSystemPrompt(ctx: Ctx): Promise<string> {
     ? jobs
         .map((j) => {
           const sched = j.regular_schedule.length ? j.regular_schedule.map((e) => `${WD[e.weekday]} ${e.start}–${e.end}${e.break_minutes ? ` (${e.break_minutes}m break)` : ""}`).join(", ") : "no fixed schedule";
-          return `[${j.id}] ${jobLabel(j)}, ${mm(j.current_rate_cents)}/h, pay ${j.pay_frequency ?? "NOT SET"}${j.pay_days?.length ? ` on days ${j.pay_days.join(" & ")}` : ""}. ${describeNextPayday(j, ctx.today)} Schedule: ${sched}.`;
+          return `[${j.id}] ${jobLabel(j)}, ${mm(j.current_rate_cents)}/h, pay ${j.pay_frequency ?? "NOT SET"}${j.pay_days?.length ? ` on days ${j.pay_days.join(" & ")}` : ""}. ${describeNextPayday(j, ctx.today)}${j.pay_confirmed_at ? "" : " PAYDAYS NOT CONFIRMED: before anything else, ask whether that next payday is right; fix it with update_job or confirm it with update_job confirm_pay=true."} Schedule: ${sched}.`;
         })
         .join("\n")
     : "none yet";

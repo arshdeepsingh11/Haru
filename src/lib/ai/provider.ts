@@ -32,7 +32,8 @@ export interface ChatProvider {
 }
 
 /** Gemini models tried in order when the main one is busy. Override with HARU_AI_FALLBACK_MODELS (comma-separated). */
-export const DEFAULT_GEMINI_FALLBACKS = ["gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-2.5-flash"];
+/** Flash-lite is left out: it is fast but drops details when saving many things at once. */
+export const DEFAULT_GEMINI_FALLBACKS = ["gemini-3.6-flash", "gemini-2.5-flash"];
 
 export class ProviderUnavailable extends Error {}
 
