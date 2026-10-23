@@ -284,3 +284,32 @@ create table goal_contributions (
   created_at timestamptz not null default now(),
   foreign key (goal_id, user_id) references savings_goals(id, user_id) on delete cascade
 );
+
+-- ---------------------------------------------------------------------------
+-- Notifications
+-- ---------------------------------------------------------------------------
+create table reminders (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references app_users(id) on delete cascade,
+  category text not null check (category in ('shift','log_hours','payday','bill','goal','opportunity','custom')),
+  title text not null check (length(title) between 1 and 140),
+  body text,
+  url text not null default '/',
+  fire_at timestamptz not null,
+  status text not null default 'pending'
+    check (status in ('pending','sending','sent','failed','cancelled','expired')),
+  attempts integer not null default 0,
+  next_attempt_at timestamptz,          -- retry backoff; null = fire_at
+  locked_at timestamptz,
+  sent_at timestamptz,
+  last_error text,
+  origin text not null default 'user' check (origin in ('auto','user','ai')),
+  source_type text,
+  source_id uuid,
+  dedupe_key text not null,
+  read_at timestamptz,
+  created_at timestamptz not null default now(),
+  unique (user_id, dedupe_key)
+);
+create index reminders_due_idx on reminders((coalesce(next_attempt_at, fire_at))) where status = 'pending';
+create index reminders_user_idx on reminders(user_id, fire_at desc);
