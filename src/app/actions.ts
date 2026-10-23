@@ -220,3 +220,55 @@ export async function loadSchedule(weekStart?: string) {
   };
 }
 export type ScheduleData = Awaited<ReturnType<typeof loadSchedule>>;
+
+/** A month of shifts, one-time work and paydays for the calendar. `month` is "YYYY-MM" (defaults to this month). */
+export async function loadMonth(month?: string) {
+  const ctx = await requireCtx();
+  const { listJobs, jobLabel, payRuleOf } = await import("@/lib/server/services/jobs");
+  const { listShifts, materializeSchedules } = await import("@/lib/server/services/shifts");
+  const { listOpportunities } = await import("@/lib/server/services/opportunities");
+  const { addDays, startOfWeek, localTime, makeDate, endOfMonth } = await import("@/lib/domain/time");
+  const { periodsPaidBetween, validateRule } = await import("@/lib/domain/payroll");
+  await materializeSchedules(ctx, 35).catch(() => 0);
+  const m = month && /^\d{4}-\d{2}$/.test(month) ? month : ctx.today.slice(0, 7);
+  const first = makeDate(Number(m.slice(0, 4)), Number(m.slice(5, 7)), 1);
+  const gridStart = startOfWeek(first, ctx.prefs.week_starts_on);
+  const gridEnd = addDays(startOfWeek(endOfMonth(first), ctx.prefs.week_starts_on), 6);
+  const [jobs, shifts, opps] = await Promise.all([listJobs(ctx), listShifts(ctx, { start: gridStart, end: gridEnd }), listOpportunities(ctx)]);
+  const paydays: { date: string; jobId: string; jobName: string }[] = [];
+  for (const j of jobs.filter((x) => x.status === "active")) {
+    const rule = payRuleOf(j);
+    if (!rule || validateRule(rule)) continue;
+    for (const p of periodsPaidBetween(rule, gridStart, gridEnd)) paydays.push({ date: p.payDate, jobId: j.id, jobName: jobLabel(j) });
+  }
+  return {
+    today: ctx.today,
+    month: m,
+    gridStart,
+    gridEnd,
+    weekStartsOn: ctx.prefs.week_starts_on,
+    currency: ctx.currency,
+    taxPercent: ctx.prefs.reserve_percent,
+    jobs: jobs.map((j, i) => ({ id: j.id, name: jobLabel(j), employer: j.employer, rateCents: j.current_rate_cents, color: i, schedule: j.regular_schedule })),
+    shifts: shifts
+      .filter((s) => s.status !== "cancelled")
+      .map((s) => ({
+        id: s.id,
+        jobId: s.job_id,
+        jobName: s.job_name,
+        date: s.work_date,
+        start: s.starts_at ? localTime(s.starts_at, ctx.tz) : null,
+        end: s.ends_at ? localTime(s.ends_at, ctx.tz) : null,
+        minutes: s.paid_minutes,
+        takeHomeCents: takeHome(ctx, s.gross_cents),
+        status: s.status,
+        attendance: s.attendance,
+        ended: s.ends_at ? s.ends_at.getTime() < Date.now() : s.work_date < ctx.today,
+      })),
+    extras: opps
+      .filter((o) => o.work_date && o.work_date >= gridStart && o.work_date <= gridEnd && o.status !== "declined")
+      .map((o) => ({ id: o.id, name: o.name, date: o.work_date!, offeredCents: o.offered_cents, minutes: o.expected_minutes, start: o.starts_at ? localTime(o.starts_at, ctx.tz) : null })),
+    paydays,
+  };
+}
+export type MonthData = Awaited<ReturnType<typeof loadMonth>>;
