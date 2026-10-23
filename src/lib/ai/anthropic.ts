@@ -26,7 +26,7 @@ export class AnthropicProvider implements ChatProvider {
         model: this.model,
         max_tokens: req.maxTokens ?? 1500,
         system: [{ type: "text", text: req.system }],
-        tools: req.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.inputSchema as Anthropic.Tool.InputSchema })),
+        ...(req.tools.length ? { tools: req.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.inputSchema as Anthropic.Tool.InputSchema })) } : {}),
         messages,
       });
     } catch (e) {

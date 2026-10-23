@@ -222,8 +222,9 @@ export class GeminiProvider implements ChatProvider {
     const json = await this.generate((model, switched, thinking) => ({
       systemInstruction: { parts: [{ text: req.system }] },
       contents: switched ? resignContents(contents) : contents,
-      tools: [{ functionDeclarations: req.tools.map((t) => ({ name: t.name, description: t.description, parametersJsonSchema: t.inputSchema })) }],
-      toolConfig: { functionCallingConfig: { mode: "AUTO" } },
+      ...(req.tools.length
+        ? { tools: [{ functionDeclarations: req.tools.map((t) => ({ name: t.name, description: t.description, parametersJsonSchema: t.inputSchema })) }], toolConfig: { functionCallingConfig: { mode: "AUTO" } } }
+        : {}),
       // Thought tokens count toward the output limit, so leave room for the actual reply.
       generationConfig: { maxOutputTokens: req.maxTokens ?? 8192, ...(thinking ? { thinkingConfig: thinkingFor(model) } : {}) },
     }));

@@ -16,6 +16,10 @@ import { CARD_KEYS, CARDS, type CardKey } from "../dashboard-registry";
 import { changeCards, getCards } from "../server/services/cards";
 import { completeOnboarding } from "../server/services/prefs";
 import { forget, remember } from "../server/services/memory";
+import { ASSETS, ASSET_MAP } from "../invest/catalog";
+import { getQuote, isQuote, getDaily } from "../server/invest/market";
+import { statsFor } from "../invest/analytics";
+import { getProfile } from "../server/invest/service";
 import { createJob, getJob, jobLabel, listJobs, payRuleOf, updateJob, wagesFor } from "../server/services/jobs";
 import { createShift, deleteShift, getShift, listShifts, updateShift } from "../server/services/shifts";
 import { createOpportunity, describeOpportunity, getOpportunity, listOpportunities, updateOpportunityStatus } from "../server/services/opportunities";
@@ -591,6 +595,29 @@ export const TOOLS: ToolDef[] = [
     schema: z.object({ memory_id: z.number().int().positive() }),
     risk: "write",
     run: async (ctx, a) => ({ summary: `Forgot: ${await forget(ctx, a.memory_id)}` }),
+  }),
+  tool({
+    name: "get_market",
+    description: `Live or latest market data HARU tracks (prices, day change, 1M/1Y/5Y returns, volatility) for India, Canada and world assets, plus what the user follows in the Invest tab. Asset keys: ${ASSETS.filter((a) => !a.key.endsWith(":raw")).map((a) => a.key).join(", ")}. Always say these are market data with their date and source; any view you add is your estimate, not advice.`,
+    schema: z.object({ asset_keys: z.array(z.string()).min(1).max(8).optional().describe("Omit to get what the user follows") }),
+    risk: "read",
+    run: async (ctx, a) => {
+      const profile = await getProfile(ctx);
+      const keysWanted = a.asset_keys?.length ? a.asset_keys : [];
+      const out = [];
+      for (const k of keysWanted.slice(0, 8)) {
+        const asset = ASSET_MAP.get(k);
+        if (!asset) {
+          out.push({ key: k, error: "unknown asset key" });
+          continue;
+        }
+        const q = await getQuote(asset);
+        const d = await getDaily(asset).catch(() => null);
+        const st = d?.candles.length ? statsFor(d.candles) : null;
+        out.push({ key: k, name: asset.name, currency: asset.currency, unit: asset.unit ?? null, quote: isQuote(q) ? { price: q.price, change_pct: q.changePct, as_of: q.asOf, source: q.source, freshness: q.freshness } : { unavailable: q.unavailable }, returns: st ? { r1m: st.r1m, r1y: st.r1y, r5y: st.r5y, vol_1y: st.vol1y } : null });
+      }
+      return { summary: keysWanted.length ? `Looked up ${keysWanted.length} market${keysWanted.length === 1 ? "" : "s"}.` : "Read what you follow in Invest.", data: { follows: profile, assets: out } };
+    },
   }),
   tool({
     name: "complete_setup",
