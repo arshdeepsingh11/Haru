@@ -14,6 +14,7 @@ const { ctxForUser } = await import("../../src/lib/server/user-context");
 const invest = await import("../../src/lib/server/invest/service");
 const news = await import("../../src/lib/server/invest/news");
 const cache = await import("../../src/lib/server/invest/cache");
+const planning = await import("../../src/lib/server/invest/planning");
 import type { Ctx } from "../../src/lib/server/user-context";
 
 const U = randomUUID();
@@ -119,4 +120,43 @@ test("overview without API keys: news and structure, no invented prices", { skip
     const q = r.quote as { price?: number; source?: string; unavailable?: string } | null;
     if (q && typeof q.price === "number") assert.ok(q.source, `${r.key} has a price with a named source`);
   }
+});
+
+test("alerts: set, refuse one already true, fire once into the reminder queue", { skip }, async () => {
+  const key = "WORLD:metal:XAU";
+  const now = new Date().toISOString();
+  // A fresh cached quote stands in for the market (no network in tests).
+  await cache.cacheSet(`q:${key}`, { key, price: 2000, prevClose: 1990, change: 10, changePct: 0.5, asOf: now, source: "test", freshness: "live", stale: false, currency: "USD" }, 60e3);
+  await assert.rejects(() => planning.addAlert(u, { key, direction: "above", target: 1500 }), /already above/);
+  const a = await planning.addAlert(u, { key, direction: "above", target: 2100 });
+  assert.equal(a.active, true);
+  assert.equal(a.priceAtCreate, 2000);
+  assert.equal((await planning.listAlerts(u, key)).length, 1);
+  assert.equal((await planning.listAlerts(v)).length, 0, "other people never see it");
+
+  let r = await planning.checkAlerts({ force: true });
+  assert.equal(r.fired, 0, "not crossed yet");
+  await cache.cacheSet(`q:${key}`, { key, price: 2105.5, prevClose: 2000, change: 105.5, changePct: 5.3, asOf: now, source: "test", freshness: "live", stale: false, currency: "USD" }, 60e3);
+  r = await planning.checkAlerts({ force: true });
+  assert.ok(r.fired >= 1);
+  const [rem] = await sql<{ category: string; title: string; url: string }[]>`select category, title, url from reminders where user_id = ${U} and dedupe_key = ${`alert:${a.id}`}`;
+  assert.equal(rem.category, "market");
+  assert.match(rem.title, /Gold.*above/i);
+  assert.equal(rem.url, "/?view=invest");
+  const after = (await planning.listAlerts(u, key))[0];
+  assert.equal(after.active, false);
+  assert.equal(after.triggeredPrice, 2105.5);
+  r = await planning.checkAlerts({ force: true });
+  assert.equal(r.fired, 0, "fires only once");
+  await planning.removeAlert(u, a.id);
+  await assert.rejects(() => planning.removeAlert(u, a.id));
+});
+
+test("planners: budget inputs come back so the phone can run what-ifs", { skip, timeout: 60_000 }, async () => {
+  const p = await planning.planData(u);
+  assert.equal(p.currency, u.currency);
+  assert.equal(typeof p.inputs.monthlyTakeHomeCents, "number");
+  assert.ok(Array.isArray(p.inputs.debts));
+  assert.equal(typeof p.plan.surplusCents, "number");
+  assert.ok(Array.isArray(p.fx.series));
 });
