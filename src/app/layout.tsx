@@ -1,9 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import { Sora } from "next/font/google";
+import { Geist, Unbounded } from "next/font/google";
 import "./globals.css";
 import { ServiceWorker } from "@/components/ServiceWorker";
 
-const sora = Sora({ subsets: ["latin"], variable: "--font-sora", display: "swap" });
+const geist = Geist({ subsets: ["latin"], variable: "--font-geist", display: "swap" });
+const unbounded = Unbounded({ subsets: ["latin"], variable: "--font-unbounded", display: "swap", weight: ["400", "500", "600"] });
 
 export const metadata: Metadata = {
   title: { default: "HARU — Work for Haru.", template: "%s, HARU" },
@@ -15,7 +16,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#f6f3ff",
+  themeColor: "#f4f6fb",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -23,7 +24,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={sora.variable}>
+    <html lang="en" className={`${geist.variable} ${unbounded.variable}`}>
       <body className="min-h-dvh">
         {children}
         <ServiceWorker />

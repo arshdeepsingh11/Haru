@@ -29,7 +29,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastCtx.Provider value={push}>
       {children}
-      <div aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-24 z-[60] flex flex-col items-center gap-2 px-4 lg:bottom-6">
+      <div aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-28 z-[60] flex flex-col items-center gap-2 px-4 lg:bottom-6">
         {toasts.map((t) => (
           <div key={t.id} role="status" className={`sheet-enter pointer-events-auto max-w-md rounded-2xl px-4 py-2.5 text-sm shadow-lg ${t.tone === "error" ? "bg-brick text-white" : "bg-ink text-paper"}`}>
             {t.text}
@@ -77,17 +77,18 @@ export function Sheet({ open, onClose, title, children, wide = false }: { open: 
       onClose={onClose}
       onClick={(e) => e.target === ref.current && onClose()}
       aria-label={title}
-      className={`m-0 mt-auto max-h-[92dvh] w-full max-w-none rounded-t-3xl border border-line bg-paper p-0 text-ink backdrop:bg-black/30 backdrop:backdrop-blur-sm sm:m-auto sm:rounded-3xl ${wide ? "sm:max-w-3xl" : "sm:max-w-xl"}`}
+      className={`m-0 mt-auto max-h-[94dvh] w-full max-w-none rounded-t-[30px] border-0 bg-[color:var(--mist)] p-0 text-ink shadow-2xl backdrop:bg-[rgb(18_20_43/0.28)] backdrop:backdrop-blur-sm sm:m-auto sm:rounded-[30px] ${wide ? "sm:max-w-3xl" : "sm:max-w-xl"}`}
     >
       {open && (
-        <div className="sheet-enter flex max-h-[92dvh] flex-col">
-          <header className="flex items-center justify-between border-b border-line px-5 py-3.5">
-            <h2 className="text-base font-semibold">{title}</h2>
+        <div className="sheet-enter flex max-h-[94dvh] flex-col">
+          <div className="mx-auto mt-2.5 h-1.5 w-10 rounded-full bg-ink/15 sm:hidden" aria-hidden />
+          <header className="flex items-center justify-between px-5 pb-2 pt-3">
+            <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
             <button className="btn btn-quiet -mr-2 px-2" onClick={onClose} aria-label="Close">
               <X size={18} />
             </button>
           </header>
-          <div className="scroll-thin overflow-y-auto px-5 py-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">{children}</div>
+          <div className="scroll-thin min-w-0 overflow-y-auto overflow-x-hidden px-5 py-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">{children}</div>
         </div>
       )}
     </dialog>
@@ -103,7 +104,7 @@ export function Progress({ value, tone = "moss", label }: { value: number; tone?
   const pct = Math.max(0, Math.min(100, value));
   return (
     <div role="progressbar" aria-label={label} aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100} className="h-2 w-full overflow-hidden rounded-full bg-paper-2">
-      <div className={`bar-grow h-full rounded-full ${tone === "moss" ? "bg-moss" : tone === "goal" ? "bg-goal" : "bg-slate"}`} style={{ width: `${pct}%` }} />
+      <div className="bar-grow h-full rounded-full" style={{ width: `${pct}%`, background: tone === "slate" ? "var(--ink)" : "var(--aurora)" }} />
     </div>
   );
 }
