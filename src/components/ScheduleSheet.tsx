@@ -121,12 +121,12 @@ function Calendar({ data, selected, onSelect, onMonth, reload, onScan, onOpenJob
                 onClick={() => onSelect(d)}
                 aria-label={`${dayTitle(d, data.today)}: ${list.length} shift${list.length === 1 ? "" : "s"}${pay.length ? `, payday ${pay.map((p) => p.jobName).join(", ")}` : ""}`}
                 aria-pressed={isSel}
-                className={`relative flex min-h-[3.5rem] flex-col rounded-xl px-1 pb-1 pt-1 text-left transition ${isSel ? "bg-ink text-white" : isToday ? "bg-violet-soft" : "hover:bg-paper-2"} ${inMonth(d) ? "" : "opacity-35"}`}
+                className={`relative flex min-h-[3.5rem] flex-col rounded-xl px-1 pb-1 pt-1 text-left transition ${isSel ? "solid" : isToday ? "bg-violet-soft" : "hover:bg-paper-2"} ${inMonth(d) ? "" : "opacity-35"}`}
               >
                 <span className="flex items-center gap-1">
                   <span className={`text-xs font-semibold ${isToday && !isSel ? "text-iris" : ""}`}>{Number(d.slice(8))}</span>
                   {pay.length > 0 && (
-                    <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full text-[0.6rem] font-bold text-white" style={{ background: "var(--aurora)" }} aria-hidden>
+                    <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full text-[0.6rem] font-bold coin" aria-hidden>
                       $
                     </span>
                   )}
@@ -154,7 +154,7 @@ function Calendar({ data, selected, onSelect, onMonth, reload, onScan, onOpenJob
             </span>
           ))}
           <span className="inline-flex items-center gap-1.5">
-            <span className="grid h-3.5 w-3.5 place-items-center rounded-full text-[0.55rem] font-bold text-white" style={{ background: "var(--aurora)" }}>
+            <span className="grid h-3.5 w-3.5 place-items-center rounded-full text-[0.55rem] font-bold coin">
               $
             </span>
             Payday
@@ -204,7 +204,7 @@ function Day({
 
       {pay.map((p) => (
         <p key={p.jobId} className="flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold text-iris" style={{ background: "var(--aurora-soft)" }}>
-          <span className="grid h-5 w-5 place-items-center rounded-full text-[0.65rem] text-white" style={{ background: "var(--aurora)" }}>
+          <span className="grid h-5 w-5 place-items-center rounded-full text-[0.65rem] coin">
             $
           </span>
           {p.jobName} payday

@@ -7,13 +7,13 @@ function weekTick(d: string) {
   return new Date(`${d}T12:00:00Z`).toLocaleDateString("en-CA", { month: "short", day: "numeric", timeZone: "UTC" });
 }
 const tooltipStyle = {
-  background: "rgb(255 255 255 / 0.9)",
+  background: "rgb(50 54 56 / 0.95)",
   backdropFilter: "blur(12px)",
-  border: "1px solid rgb(124 58 237 / 0.18)",
+  border: "1px solid rgb(255 255 255 / 0.12)",
   borderRadius: 14,
   fontSize: 12,
-  color: "#1e1537",
-  boxShadow: "0 12px 30px -12px rgb(76 29 149 / 0.35)",
+  color: "#f7f4ef",
+  boxShadow: "0 12px 30px -12px rgb(0 0 0 / 0.4)",
 };
 
 /** What you took home each week (after the tax estimate) — real logged work only. */
@@ -26,19 +26,19 @@ export function EarningsChart({ weekly, taxPercent = 5 }: { weekly: { weekStart:
         <AreaChart data={rows} margin={{ top: 10, right: 4, bottom: 0, left: -14 }}>
           <defs>
             <linearGradient id="earn-fill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.45} />
-              <stop offset="100%" stopColor="#c4b5fd" stopOpacity={0.02} />
+              <stop offset="0%" stopColor="#e2c58f" stopOpacity={0.45} />
+              <stop offset="100%" stopColor="#e2c58f" stopOpacity={0.02} />
             </linearGradient>
             <linearGradient id="earn-line" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor="#6d28d9" />
-              <stop offset="100%" stopColor="#c084fc" />
+              <stop offset="0%" stopColor="#c9a464" />
+              <stop offset="100%" stopColor="#f1dcb1" />
             </linearGradient>
           </defs>
-          <CartesianGrid vertical={false} stroke="rgb(124 58 237 / 0.1)" />
-          <XAxis dataKey="week" tickFormatter={weekTick} tick={{ fontSize: 11, fill: "#8b84a6" }} axisLine={false} tickLine={false} />
-          <YAxis tick={{ fontSize: 11, fill: "#8b84a6" }} axisLine={false} tickLine={false} width={48} tickFormatter={(v: number) => (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${v}`)} />
+          <CartesianGrid vertical={false} stroke="rgb(255 255 255 / 0.08)" />
+          <XAxis dataKey="week" tickFormatter={weekTick} tick={{ fontSize: 11, fill: "rgba(247,244,239,0.55)" }} axisLine={false} tickLine={false} />
+          <YAxis tick={{ fontSize: 11, fill: "rgba(247,244,239,0.55)" }} axisLine={false} tickLine={false} width={48} tickFormatter={(v: number) => (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${v}`)} />
           <Tooltip contentStyle={tooltipStyle} labelFormatter={(l: unknown) => `Week of ${weekTick(String(l))}`} formatter={(v: unknown) => [money(Math.round(Number(v) * 100)), "Took home"]} />
-          <Area type="monotone" dataKey="net" stroke="url(#earn-line)" strokeWidth={3} fill="url(#earn-fill)" dot={{ r: 3, fill: "#7c3aed", strokeWidth: 0 }} activeDot={{ r: 6, fill: "#7c3aed", stroke: "#fff", strokeWidth: 2 }} />
+          <Area type="monotone" dataKey="net" stroke="url(#earn-line)" strokeWidth={3} fill="url(#earn-fill)" dot={{ r: 3, fill: "#e2c58f", strokeWidth: 0 }} activeDot={{ r: 6, fill: "#e2c58f", stroke: "#fff", strokeWidth: 2 }} />
         </AreaChart>
       </ResponsiveContainer>
     </div>
@@ -54,13 +54,13 @@ export function SpendingChart({ weekly }: { weekly: { weekStart: string; cents: 
         <BarChart data={rows} margin={{ top: 4, right: 0, bottom: 0, left: -18 }} barCategoryGap="30%">
           <defs>
             <linearGradient id="spend-fill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#c4b5fd" />
-              <stop offset="100%" stopColor="#ede9fe" />
+              <stop offset="0%" stopColor="#e2c58f" />
+              <stop offset="100%" stopColor="#6b6f71" />
             </linearGradient>
           </defs>
-          <XAxis dataKey="week" tickFormatter={weekTick} tick={{ fontSize: 10, fill: "#8b84a6" }} axisLine={false} tickLine={false} />
+          <XAxis dataKey="week" tickFormatter={weekTick} tick={{ fontSize: 10, fill: "rgba(247,244,239,0.55)" }} axisLine={false} tickLine={false} />
           <YAxis hide />
-          <Tooltip cursor={{ fill: "rgb(124 58 237 / 0.06)" }} contentStyle={tooltipStyle} labelFormatter={(l: unknown) => `Week of ${weekTick(String(l))}`} formatter={(v: unknown) => [money(Math.round(Number(v) * 100)), "Spent"]} />
+          <Tooltip cursor={{ fill: "rgb(255 255 255 / 0.06)" }} contentStyle={tooltipStyle} labelFormatter={(l: unknown) => `Week of ${weekTick(String(l))}`} formatter={(v: unknown) => [money(Math.round(Number(v) * 100)), "Spent"]} />
           <Bar dataKey="spent" fill="url(#spend-fill)" radius={[6, 6, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>

@@ -176,12 +176,12 @@ function Ring({ pct, children }: { pct: number; children: React.ReactNode }) {
       <svg viewBox="0 0 72 72" className="h-full w-full -rotate-90" aria-hidden>
         <defs>
           <linearGradient id="ring-aurora" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stopColor="#6e56ff" />
-            <stop offset="0.6" stopColor="#2bc8e8" />
-            <stop offset="1" stopColor="#ff6fb5" />
+            <stop offset="0" stopColor="#c9a464" />
+            <stop offset="0.6" stopColor="#ead2a1" />
+            <stop offset="1" stopColor="#c3d0d6" />
           </linearGradient>
         </defs>
-        <circle cx="36" cy="36" r={r} fill="none" stroke="rgb(18 20 43 / 0.07)" strokeWidth="6" />
+        <circle cx="36" cy="36" r={r} fill="none" stroke="rgb(255 255 255 / 0.1)" strokeWidth="6" />
         <circle cx="36" cy="36" r={r} fill="none" stroke="url(#ring-aurora)" strokeWidth="6" strokeLinecap="round" strokeDasharray={`${Math.max(c * v, 0.01)} ${c}`} />
       </svg>
       <div className="absolute inset-0 grid place-items-center text-center">{children}</div>
@@ -263,7 +263,7 @@ export function PayoffPlanCard({ c, onAsk }: { c: CoachData; onAsk: (t: string) 
       <ol className="mt-4 grid gap-1">
         {p.items.map((it, i) => (
           <li key={it.id} className={`flex items-center gap-3 rounded-2xl px-3 py-2.5 ${i === 0 ? "bg-violet-soft" : ""}`}>
-            <span className={`figure grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs ${i === 0 ? "bg-ink text-white" : "bg-paper-2 text-ink-2"}`}>{i + 1}</span>
+            <span className={`figure grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs ${i === 0 ? "solid" : "bg-paper-2 text-ink-2"}`}>{i + 1}</span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold">{it.name}</p>
               <p className="truncate text-xs text-ink-3">{i === 0 ? "Put every extra dollar here" : it.reason}</p>

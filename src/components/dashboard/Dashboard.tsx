@@ -278,7 +278,7 @@ export function Dashboard({ data, onAsk, onOpenRecords, onOpenSchedule, onOpenJo
           <div key={k} className={`relative ${fresh.includes(k) ? "card-new" : ""}`}>
             {node}
             {editing && (
-              <button className="absolute -right-1.5 -top-1.5 z-10 grid h-8 w-8 place-items-center rounded-full bg-ink text-white shadow-lg" onClick={() => remove(k)} aria-label={`Remove ${CARDS[k].title}`}>
+              <button className="absolute -right-1.5 -top-1.5 z-10 grid h-8 w-8 place-items-center rounded-full solid shadow-lg" onClick={() => remove(k)} aria-label={`Remove ${CARDS[k].title}`}>
                 <Minus size={16} />
               </button>
             )}

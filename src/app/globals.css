@@ -1,46 +1,91 @@
 @import "tailwindcss";
 
-/* HARU — light aurora.
-   Quiet white glass and ink everywhere; the aurora (iris, lagoon, bloom) is reserved
-   for the orb, money you can earn, and the moments when HARU is thinking.
-   Anything not yet real (scheduled, expected) is dashed. */
+/* HARU: warm stone and charcoal glass.
+   The page is warm stone (#F3F1F0). Cards, sheets and the dock are smoked charcoal glass
+   (#494D4F) with light text: inside them the colour tokens flip automatically (.dark-scope).
+   One accent, champagne, marks money you can earn and the things Haru is doing.
+   Gains are sage, losses are coral; anything not yet real (scheduled, expected) is dashed. */
 :root {
-  --mist: #f4f6fb;
-  --paper: #f4f6fb;
-  --paper-2: #eceff7;
+  --stone: #f3f1f0;
+  --charcoal: #494d4f;
+  --mist: #f3f1f0;
+  --paper: #f3f1f0;
+  --paper-2: #e8e5e2;
   --surface: #ffffff;
-  --glass: rgb(255 255 255 / 0.66);
-  --glass-strong: rgb(255 255 255 / 0.86);
-  --glass-edge: rgb(255 255 255 / 0.95);
-  --ink: #12142b;
-  --ink-2: #5b6282;
-  --ink-3: #969cb4;
-  --line: rgb(18 20 43 / 0.08);
+  --field: #ffffff;
+  --glass: rgb(73 77 79 / 0.9);
+  --glass-strong: rgb(66 70 72 / 0.94);
+  --glass-edge: rgb(255 255 255 / 0.1);
+  --ink: #26292b;
+  --ink-2: #5d6265;
+  --ink-3: #8c9194;
+  --line: rgb(38 41 43 / 0.1);
 
-  --iris: #6e56ff;
-  --lagoon: #2bc8e8;
-  --bloom: #ff6fb5;
-  --aurora: linear-gradient(115deg, #6e56ff 0%, #4f8bff 38%, #2bc8e8 68%, #ff6fb5 100%);
-  --aurora-soft: linear-gradient(115deg, rgb(110 86 255 / 0.12), rgb(43 200 232 / 0.12) 60%, rgb(255 111 181 / 0.12));
+  /* accent family (names kept from earlier themes so components don't change) */
+  --iris: #8a6a2f; /* champagne/brass, dark enough to read on stone */
+  --lagoon: #5b7d90; /* steel blue */
+  --bloom: #b36f5c; /* rose gold */
+  --aurora: linear-gradient(115deg, #b08a4a 0%, #d8bb83 40%, #9aaab3 100%);
+  --aurora-soft: linear-gradient(115deg, rgb(176 138 74 / 0.14), rgb(154 170 179 / 0.14));
+  --primary-bg: #494d4f;
+  --primary-fg: #f7f4ef;
+  --primary-shadow: 0 10px 22px -12px rgb(30 32 33 / 0.7);
 
-  /* semantic tokens used across components */
-  --violet: #6e56ff;
-  --violet-2: #2bc8e8;
-  --violet-3: #c9c0ff;
-  --violet-soft: #efecff;
-  --moss: #6e56ff;
-  --moss-soft: #efecff;
-  --amber: #d9700a;
-  --amber-soft: #fff1e2;
-  --brick: #e5345b;
-  --brick-soft: #ffe8ee;
-  --slate: #7a819c;
-  --slate-soft: #eef0f6;
-  --goal: #1aa6c9;
-  --goal-soft: #e3f7fc;
-  --focus: #6e56ff;
-  --shadow: 0 1px 2px rgb(18 20 43 / 0.04), 0 24px 48px -32px rgb(40 44 110 / 0.35);
+  --violet: var(--iris);
+  --violet-2: var(--lagoon);
+  --violet-3: #d8c9a8;
+  --violet-soft: rgb(176 138 74 / 0.12);
+  --moss: #3f8a63; /* gains */
+  --moss-soft: rgb(63 138 99 / 0.12);
+  --amber: #b06d10;
+  --amber-soft: rgb(214 140 30 / 0.14);
+  --brick: #c4473b; /* losses / overdue */
+  --brick-soft: rgb(196 71 59 / 0.12);
+  --slate: #6e7477;
+  --slate-soft: rgb(110 116 119 / 0.12);
+  --goal: #5b7d90;
+  --goal-soft: rgb(91 125 144 / 0.14);
+  --focus: #b08a4a;
+  --shadow: 0 1px 2px rgb(20 22 23 / 0.08), 0 26px 50px -30px rgb(20 22 23 / 0.55);
   color-scheme: light;
+}
+
+/* Everything inside charcoal glass: light text, champagne accent, dark native pickers. */
+.dark-scope,
+.glass,
+.panel,
+.glass-strong,
+.hero {
+  --paper-2: rgb(255 255 255 / 0.07);
+  --surface: rgb(255 255 255 / 0.06);
+  --field: rgb(255 255 255 / 0.08);
+  --ink: #f7f4ef;
+  --ink-2: rgb(247 244 239 / 0.72);
+  --ink-3: rgb(247 244 239 / 0.5);
+  --line: rgb(255 255 255 / 0.11);
+  --iris: #e2c58f;
+  --lagoon: #a9c4d4;
+  --bloom: #e8ad99;
+  --aurora: linear-gradient(115deg, #f1dcb1 0%, #e2c58f 45%, #c3d0d6 100%);
+  --aurora-soft: linear-gradient(115deg, rgb(226 197 143 / 0.16), rgb(195 208 214 / 0.12));
+  --primary-bg: #e2c58f;
+  --primary-fg: #26292b;
+  --primary-shadow: 0 10px 24px -12px rgb(226 197 143 / 0.55);
+  --violet-soft: rgb(226 197 143 / 0.16);
+  --violet-3: rgb(226 197 143 / 0.5);
+  --moss: #7fd3a0;
+  --moss-soft: rgb(127 211 160 / 0.14);
+  --amber: #f0b45c;
+  --amber-soft: rgb(240 180 92 / 0.15);
+  --brick: #ff8f80;
+  --brick-soft: rgb(255 143 128 / 0.14);
+  --slate: #b9c0c3;
+  --slate-soft: rgb(255 255 255 / 0.08);
+  --goal: #a9c4d4;
+  --goal-soft: rgb(169 196 212 / 0.15);
+  --focus: #e2c58f;
+  color: var(--ink);
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -51,6 +96,8 @@
   --color-ink-2: var(--ink-2);
   --color-ink-3: var(--ink-3);
   --color-line: var(--line);
+  --color-charcoal: var(--charcoal);
+  --color-stone: var(--stone);
   --color-iris: var(--iris);
   --color-lagoon: var(--lagoon);
   --color-bloom: var(--bloom);
@@ -75,7 +122,7 @@
 html,
 body {
   color: var(--ink);
-  background-color: var(--mist);
+  background-color: var(--stone);
 }
 body {
   font-family: var(--font-sans);
@@ -84,7 +131,7 @@ body {
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
 }
-/* A faint aurora far behind everything, so the glass has light to bend. */
+/* Soft light and shadow far behind everything, so the glass has something to refract. */
 body::before {
   content: "";
   position: fixed;
@@ -92,13 +139,13 @@ body::before {
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(32vmax 26vmax at 18% 8%, rgb(110 86 255 / 0.14), transparent 70%),
-    radial-gradient(30vmax 24vmax at 92% 22%, rgb(43 200 232 / 0.14), transparent 70%),
-    radial-gradient(34vmax 26vmax at 60% 96%, rgb(255 111 181 / 0.1), transparent 70%);
-  animation: drift 38s ease-in-out infinite alternate;
+    radial-gradient(34vmax 26vmax at 12% 6%, rgb(255 255 255 / 0.9), transparent 70%),
+    radial-gradient(30vmax 26vmax at 95% 18%, rgb(73 77 79 / 0.13), transparent 70%),
+    radial-gradient(36vmax 26vmax at 55% 98%, rgb(176 138 74 / 0.1), transparent 70%);
+  animation: drift 40s ease-in-out infinite alternate;
 }
 @keyframes drift {
-  to { transform: translate3d(-3vmax, 2vmax, 0) rotate(4deg); }
+  to { transform: translate3d(-3vmax, 2vmax, 0) rotate(3deg); }
 }
 
 :focus-visible {
@@ -112,41 +159,41 @@ input, select, textarea { font-size: 16px; }
 @layer components {
   .glass,
   .panel {
-    background: var(--glass);
-    backdrop-filter: blur(24px) saturate(160%);
-    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    background:
+      linear-gradient(160deg, rgb(255 255 255 / 0.07), rgb(255 255 255 / 0) 42%),
+      var(--glass);
+    backdrop-filter: blur(22px) saturate(140%);
+    -webkit-backdrop-filter: blur(22px) saturate(140%);
     border: 1px solid var(--glass-edge);
     border-radius: 24px;
-    box-shadow: var(--shadow), 0 0 0 1px rgb(18 20 43 / 0.035);
+    box-shadow: var(--shadow), inset 0 1px 0 rgb(255 255 255 / 0.08);
   }
   .glass-strong {
     background: var(--glass-strong);
-    backdrop-filter: blur(28px) saturate(170%);
-    -webkit-backdrop-filter: blur(28px) saturate(170%);
+    backdrop-filter: blur(26px) saturate(150%);
+    -webkit-backdrop-filter: blur(26px) saturate(150%);
     border: 1px solid var(--glass-edge);
-    box-shadow: var(--shadow), 0 0 0 1px rgb(18 20 43 / 0.035);
+    box-shadow: var(--shadow), inset 0 1px 0 rgb(255 255 255 / 0.08);
   }
-  /* The one large card: white, with a thin aurora edge and a soft light leak. */
+  /* The one large card: deeper charcoal with a champagne hairline. */
   .hero {
     position: relative;
     border-radius: 30px;
     background:
-      radial-gradient(22rem 12rem at 100% 0%, rgb(43 200 232 / 0.12), transparent 70%),
-      radial-gradient(18rem 12rem at 0% 100%, rgb(110 86 255 / 0.1), transparent 70%),
-      var(--surface);
-    box-shadow: 0 30px 60px -36px rgb(70 60 200 / 0.45), 0 0 0 1px rgb(18 20 43 / 0.04);
+      radial-gradient(22rem 12rem at 100% 0%, rgb(226 197 143 / 0.14), transparent 70%),
+      linear-gradient(160deg, #545859 0%, #3f4345 100%);
+    box-shadow: 0 32px 60px -34px rgb(20 22 23 / 0.75), inset 0 1px 0 rgb(255 255 255 / 0.1);
   }
   .hero::before {
     content: "";
     position: absolute;
     inset: 0;
-    padding: 1.5px;
+    padding: 1px;
     border-radius: inherit;
-    background: var(--aurora);
+    background: linear-gradient(135deg, rgb(241 220 177 / 0.7), rgb(255 255 255 / 0.05) 40%, rgb(195 208 214 / 0.4));
     -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
     -webkit-mask-composite: xor;
     mask-composite: exclude;
-    opacity: 0.9;
     pointer-events: none;
   }
   .section-title {
@@ -163,13 +210,18 @@ input, select, textarea { font-size: 16px; }
     letter-spacing: -0.02em;
     font-weight: 500;
   }
-  .aurora-text {
+  .aurora-text,
+  .gradient-text {
     background: var(--aurora);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
   }
-  .gradient-text { background: var(--aurora); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  /* Solid accent fill that reads on stone and on charcoal glass alike. */
+  .solid { background: var(--primary-bg); color: var(--primary-fg); }
+  .coin { background: var(--aurora); color: #26292b; }
+  .up { color: var(--moss); }
+  .down { color: var(--brick); }
 
   .btn {
     display: inline-flex;
@@ -186,33 +238,27 @@ input, select, textarea { font-size: 16px; }
   }
   .btn:active:not(:disabled) { transform: scale(0.97); }
   .btn:disabled { opacity: 0.45; cursor: not-allowed; }
-  .btn-primary {
-    color: #fff;
-    background: var(--ink);
-    box-shadow: 0 10px 22px -12px rgb(18 20 43 / 0.7);
-  }
-  .btn-primary:hover:not(:disabled) { box-shadow: 0 12px 28px -10px rgb(110 86 255 / 0.65); }
+  .btn-primary,
   .btn-aurora {
-    color: #fff;
-    background: var(--aurora);
-    background-size: 160% 100%;
-    box-shadow: 0 12px 26px -12px rgb(110 86 255 / 0.8);
+    color: var(--primary-fg);
+    background: var(--primary-bg);
+    box-shadow: var(--primary-shadow);
   }
   .btn-white,
   .btn-line {
     color: var(--ink);
-    background: var(--glass-strong);
+    background: var(--surface);
     border: 1px solid var(--line);
   }
   .btn-white:hover:not(:disabled),
-  .btn-line:hover:not(:disabled) { background: #fff; }
+  .btn-line:hover:not(:disabled) { background: var(--paper-2); }
   .btn-ghost-white,
   .btn-quiet {
     background: transparent;
     color: var(--ink-2);
   }
   .btn-ghost-white:hover:not(:disabled),
-  .btn-quiet:hover:not(:disabled) { background: rgb(18 20 43 / 0.05); }
+  .btn-quiet:hover:not(:disabled) { background: var(--paper-2); }
   .btn-danger { background: var(--brick); color: #fff; }
 
   .field {
@@ -224,17 +270,19 @@ input, select, textarea { font-size: 16px; }
   .input {
     width: 100%;
     border: 1px solid var(--line);
-    background: var(--surface);
+    background: var(--field);
     color: var(--ink);
     border-radius: 14px;
     padding: 0.62rem 0.85rem;
     min-height: 2.85rem;
   }
+  .input::placeholder { color: var(--ink-3); }
   .input:focus {
     outline: none;
-    border-color: var(--iris);
-    box-shadow: 0 0 0 4px rgb(110 86 255 / 0.14);
+    border-color: var(--focus);
+    box-shadow: 0 0 0 4px rgb(176 138 74 / 0.18);
   }
+  select.input option { color: #26292b; }
 
   .chip {
     display: inline-flex;
@@ -264,24 +312,23 @@ input, select, textarea { font-size: 16px; }
     color: var(--ink);
     background: var(--surface);
     border: 1px solid var(--line);
-    box-shadow: 0 6px 16px -12px rgb(40 44 110 / 0.45);
     transition: background 140ms, color 140ms, box-shadow 140ms, transform 120ms;
     touch-action: manipulation;
   }
-  .choice:hover { box-shadow: 0 0 0 1px rgb(110 86 255 / 0.35), 0 8px 18px -12px rgb(110 86 255 / 0.6); }
+  .choice:hover { border-color: var(--focus); }
   .choice:active { transform: scale(0.97); }
-  .choice[aria-pressed="true"] { color: #fff; background: var(--ink); border-color: transparent; }
+  .choice[aria-pressed="true"] { color: var(--primary-fg); background: var(--primary-bg); border-color: transparent; }
 
   .projected {
-    background-image: repeating-linear-gradient(135deg, rgb(110 86 255 / 0.14) 0 6px, transparent 6px 11px);
-    border: 1.5px dashed rgb(110 86 255 / 0.4);
+    background-image: repeating-linear-gradient(135deg, rgb(176 138 74 / 0.2) 0 6px, transparent 6px 11px);
+    border: 1.5px dashed rgb(176 138 74 / 0.5);
   }
   .unpaid {
-    background-image: repeating-linear-gradient(135deg, rgb(43 200 232 / 0.18) 0 6px, transparent 6px 11px);
-    border: 1.5px dashed rgb(43 200 232 / 0.55);
+    background-image: repeating-linear-gradient(135deg, rgb(154 170 179 / 0.25) 0 6px, transparent 6px 11px);
+    border: 1.5px dashed rgb(154 170 179 / 0.6);
   }
 
-  .scroll-thin { scrollbar-width: thin; scrollbar-color: rgb(18 20 43 / 0.15) transparent; }
+  .scroll-thin { scrollbar-width: thin; scrollbar-color: rgb(128 128 128 / 0.3) transparent; }
   .no-scrollbar { scrollbar-width: none; }
   .no-scrollbar::-webkit-scrollbar { display: none; }
 
@@ -289,7 +336,7 @@ input, select, textarea { font-size: 16px; }
   .prose-chat ul { list-style: disc; padding-left: 1.1rem; margin: 0.35rem 0; }
   .prose-chat strong { font-weight: 650; color: var(--iris); }
 
-  /* The input glows with the aurora while HARU is thinking. */
+  /* The input glows champagne while Haru is thinking. */
   .think-ring { position: relative; }
   .think-ring::before {
     content: "";
@@ -297,7 +344,7 @@ input, select, textarea { font-size: 16px; }
     inset: -2px;
     border-radius: inherit;
     padding: 2px;
-    background: conic-gradient(from var(--a, 0deg), #6e56ff, #2bc8e8, #ff6fb5, #6e56ff);
+    background: conic-gradient(from var(--a, 0deg), #b08a4a, #f1dcb1, #9aaab3, #b08a4a);
     -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
     -webkit-mask-composite: xor;
     mask-composite: exclude;
@@ -315,8 +362,8 @@ input, select, textarea { font-size: 16px; }
 }
 @keyframes spin-a { to { --a: 360deg; } }
 
-/* ----------------------------------------------------------- Aurora orb
-   Four coloured lights orbit inside a soft, morphing sphere. State changes speed and pulse. */
+/* ----------------------------------------------------------- Haru's orb
+   Liquid metal: champagne, pearl and steel light moving inside a charcoal sphere. */
 .orb {
   --s: 64px;
   position: relative;
@@ -327,9 +374,9 @@ input, select, textarea { font-size: 16px; }
 }
 .orb-halo {
   position: absolute;
-  inset: -22%;
+  inset: -20%;
   border-radius: 50%;
-  background: radial-gradient(circle, rgb(110 86 255 / 0.32), rgb(43 200 232 / 0.18) 45%, transparent 70%);
+  background: radial-gradient(circle, rgb(226 197 143 / 0.35), rgb(73 77 79 / 0.16) 50%, transparent 70%);
   filter: blur(calc(var(--s) * 0.12));
   z-index: -1;
   animation: halo 5s ease-in-out infinite;
@@ -339,8 +386,8 @@ input, select, textarea { font-size: 16px; }
   inset: 0;
   overflow: hidden;
   border-radius: 50%;
-  background: radial-gradient(circle at 50% 55%, #b9adff 0%, #8c7bff 45%, #6e56ff 100%);
-  box-shadow: inset 0 0 calc(var(--s) * 0.18) rgb(255 255 255 / 0.55), 0 calc(var(--s) * 0.18) calc(var(--s) * 0.4) calc(var(--s) * -0.16) rgb(80 60 230 / 0.55);
+  background: radial-gradient(circle at 50% 60%, #5e6366 0%, #43474a 55%, #2e3133 100%);
+  box-shadow: inset 0 0 calc(var(--s) * 0.16) rgb(255 255 255 / 0.25), 0 calc(var(--s) * 0.18) calc(var(--s) * 0.4) calc(var(--s) * -0.16) rgb(20 22 23 / 0.6);
   animation: morph 11s ease-in-out infinite;
   will-change: border-radius, transform;
 }
@@ -352,28 +399,28 @@ input, select, textarea { font-size: 16px; }
   height: 70%;
   border-radius: 50%;
   filter: blur(calc(var(--s) * 0.1));
-  opacity: 0.95;
+  opacity: 0.9;
   animation: orbit var(--d, 9s) linear infinite;
   will-change: transform;
 }
-.orb-body i:nth-child(1) { background: #2bc8e8; --d: 7s; --r: 22%; }
-.orb-body i:nth-child(2) { background: #ff6fb5; --d: 11s; --r: 26%; animation-direction: reverse; }
-.orb-body i:nth-child(3) { background: #6e56ff; --d: 9s; --r: 18%; animation-delay: -3s; }
-.orb-body i:nth-child(4) { background: #9bf2ff; --d: 13s; --r: 30%; width: 44%; height: 44%; left: 28%; top: 28%; animation-delay: -6s; }
+.orb-body i:nth-child(1) { background: #e2c58f; --d: 7s; --r: 22%; }
+.orb-body i:nth-child(2) { background: #9fb6c4; --d: 11s; --r: 26%; animation-direction: reverse; }
+.orb-body i:nth-child(3) { background: #d79c86; --d: 9s; --r: 18%; animation-delay: -3s; opacity: 0.7; }
+.orb-body i:nth-child(4) { background: #fbf4e6; --d: 13s; --r: 30%; width: 40%; height: 40%; left: 30%; top: 30%; animation-delay: -6s; }
 .orb-sheen {
   position: absolute;
   inset: 0;
   border-radius: inherit;
   background:
-    radial-gradient(circle at 32% 26%, rgb(255 255 255 / 0.95) 0%, rgb(255 255 255 / 0.35) 18%, transparent 42%),
-    radial-gradient(circle at 70% 82%, rgb(255 255 255 / 0.35), transparent 40%);
+    radial-gradient(circle at 32% 26%, rgb(255 255 255 / 0.9) 0%, rgb(255 255 255 / 0.3) 16%, transparent 40%),
+    radial-gradient(circle at 70% 84%, rgb(255 255 255 / 0.22), transparent 40%);
   mix-blend-mode: screen;
 }
 .orb-ring {
   position: absolute;
   inset: -6%;
   border-radius: 50%;
-  border: 1px solid rgb(110 86 255 / 0.18);
+  border: 1px solid rgb(176 138 74 / 0.35);
   opacity: 0;
 }
 @keyframes orbit {
@@ -404,7 +451,7 @@ input, select, textarea { font-size: 16px; }
   to { transform: scale(1.5); opacity: 0; }
 }
 
-/* A card HARU just placed: one aurora sweep, so you see what changed. */
+/* A card Haru just placed: one champagne sweep, so you see what changed. */
 .card-new {
   position: relative;
   animation: materialize 900ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
@@ -415,7 +462,7 @@ input, select, textarea { font-size: 16px; }
   inset: 0;
   border-radius: 24px;
   pointer-events: none;
-  background: linear-gradient(110deg, transparent 20%, rgb(110 86 255 / 0.22) 40%, rgb(43 200 232 / 0.22) 55%, transparent 75%);
+  background: linear-gradient(110deg, transparent 20%, rgb(241 220 177 / 0.22) 45%, transparent 70%);
   background-size: 250% 100%;
   animation: sweep 1.6s 200ms ease-out both;
 }
@@ -447,9 +494,15 @@ input, select, textarea { font-size: 16px; }
   to { transform: none; opacity: 1; filter: none; }
 }
 .msg-in { animation: rise 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.shimmer {
+  background: linear-gradient(90deg, rgb(255 255 255 / 0.05) 25%, rgb(255 255 255 / 0.12) 50%, rgb(255 255 255 / 0.05) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+@keyframes shimmer { to { background-position: -200% 0; } }
 
 @media (prefers-reduced-motion: reduce) {
-  body::before, .sheet-enter, .bar-grow, .rise, .msg-in, .card-new, .card-new::after,
+  body::before, .sheet-enter, .bar-grow, .rise, .msg-in, .card-new, .card-new::after, .shimmer,
   .orb-body, .orb-body i, .orb-halo, .orb-ring { animation: none !important; }
   * { transition: none !important; }
 }

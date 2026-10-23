@@ -510,7 +510,7 @@ function ActionCard({
   if (d?.kind === "scan_schedule")
     return (
       <button className="glass flex items-center gap-3 p-3.5 text-left" onClick={onScan}>
-        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl text-white" style={{ background: "var(--aurora)" }}>
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl coin">
           <Camera size={20} />
         </span>
         <span>
@@ -522,7 +522,7 @@ function ActionCard({
   if (d?.kind === "enable_push")
     return (
       <button className="glass flex items-center gap-3 p-3.5 text-left" onClick={onPush}>
-        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-ink text-white">
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl solid">
           <Bell size={20} />
         </span>
         <span>
