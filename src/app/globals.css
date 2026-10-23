@@ -335,6 +335,8 @@ input, select, textarea { font-size: 16px; }
   .prose-chat p + p { margin-top: 0.5rem; }
   .prose-chat ul { list-style: disc; padding-left: 1.1rem; margin: 0.35rem 0; }
   .prose-chat strong { font-weight: 650; color: var(--iris); }
+  /* Wide content (tables, code) scrolls inside its own box instead of widening the chat. */
+  .prose-chat table, .prose-chat pre { display: block; max-width: 100%; overflow-x: auto; }
 
   /* The input glows champagne while Haru is thinking. */
   .think-ring { position: relative; }

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowUp, Bell, Camera, Check, CircleAlert, History, LayoutGrid, Plus, RefreshCw, RotateCcw, ShieldQuestion, Sparkles, X } from "lucide-react";
+import { ArrowUp, Bell, Camera, Check, CircleAlert, History, LayoutGrid, Plus, RefreshCw, RotateCcw, ShieldQuestion, Sparkles, Trash2, X } from "lucide-react";
 import type { ActionView, MessageView } from "@/lib/ai/agent";
 import { CARDS, type CardKey } from "@/lib/dashboard-registry";
 import { enablePush } from "@/lib/push-client";
@@ -129,6 +129,7 @@ export function CommandCenter(p: CommandCenterProps) {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [conversations, setConversations] = useState<{ id: string; title: string | null }[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [speaking, setSpeaking] = useState(false);
@@ -288,7 +289,12 @@ export function CommandCenter(p: CommandCenterProps) {
         )}
         {!genesis && !setup && (
           <>
-            <button className="btn btn-quiet h-10 w-10 p-0" onClick={() => setShowHistory(!showHistory)} aria-label="Past conversations" aria-expanded={showHistory}>
+            {messages.length > 0 && (
+              <button className="btn btn-quiet h-10 w-10 p-0" onClick={() => (setConfirmClear(!confirmClear), setShowHistory(false))} aria-label="Clear this chat" aria-expanded={confirmClear}>
+                <Trash2 size={17} />
+              </button>
+            )}
+            <button className="btn btn-quiet h-10 w-10 p-0" onClick={() => (setShowHistory(!showHistory), setConfirmClear(false))} aria-label="Past conversations" aria-expanded={showHistory}>
               <History size={18} />
             </button>
             <button
@@ -306,6 +312,34 @@ export function CommandCenter(p: CommandCenterProps) {
           </>
         )}
       </header>
+
+      {confirmClear && (
+        <div role="alertdialog" aria-label="Clear this chat" className="mx-3 mb-2 grid gap-2.5 rounded-2xl bg-surface p-3.5 shadow-lg ring-1 ring-line">
+          <p className="text-sm">Clear this chat? The messages are deleted. Your jobs, shifts, bills and money records stay.</p>
+          <div className="flex gap-2">
+            <button
+              className="btn btn-primary h-9 min-h-0 flex-1 px-3 text-sm"
+              onClick={async () => {
+                setConfirmClear(false);
+                if (conversationId) {
+                  const res = await fetch("/api/ai/chat", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ conversationId }) }).catch(() => null);
+                  if (!res?.ok && res?.status !== 404) return toast("Couldn't clear the chat. Try again.", "error");
+                }
+                setConversationId(null);
+                setMessages([]);
+                setConversations((cs) => cs.filter((c) => c.id !== conversationId));
+                toast("Chat cleared.");
+                inputRef.current?.focus();
+              }}
+            >
+              <Trash2 size={14} /> Clear chat
+            </button>
+            <button className="btn btn-quiet h-9 min-h-0 px-3 text-sm" onClick={() => setConfirmClear(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {showHistory && (
         <nav aria-label="Past conversations" className="scroll-thin mx-3 mb-2 max-h-60 overflow-y-auto rounded-2xl bg-surface p-2 shadow-lg ring-1 ring-line">
@@ -325,7 +359,7 @@ export function CommandCenter(p: CommandCenterProps) {
         </nav>
       )}
 
-      <div className="scroll-thin min-h-0 flex-1 overflow-y-auto px-4 pb-4" aria-live="polite">
+      <div className="scroll-thin min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-4 pb-4" aria-live="polite">
         {!aiConfigured && (
           <p className="mb-3 rounded-2xl bg-amber-soft px-4 py-3 text-sm text-ink">
             The AI isn't configured yet. Add GEMINI_API_KEY to the server environment and restart. Everything else works meanwhile.
@@ -352,7 +386,7 @@ export function CommandCenter(p: CommandCenterProps) {
             </button>
           </div>
         ) : (
-          <ol className="grid gap-5">
+          <ol className="grid grid-cols-[minmax(0,1fr)] gap-5">
             {firstRun && setup && (
               <li className="msg-in">
                 <Bubble>{renderText("First things first. What should I call you?")}</Bubble>
@@ -373,14 +407,14 @@ export function CommandCenter(p: CommandCenterProps) {
             {messages.map((m) => {
               if (m.role === "user")
                 return (
-                  <li key={m.id} className="msg-in flex justify-end">
-                    <p className="max-w-[82%] whitespace-pre-wrap rounded-[22px] rounded-br-md bg-ink px-4 py-2.5 text-[0.97rem] text-white">{m.content}</p>
+                  <li key={m.id} className="msg-in flex min-w-0 justify-end">
+                    <p className="max-w-[82%] whitespace-pre-wrap break-words [overflow-wrap:anywhere] rounded-[22px] rounded-br-md bg-ink px-4 py-2.5 text-[0.97rem] text-white">{m.content}</p>
                   </li>
                 );
               const { body, choices } = splitChoices(m.content);
               const isLast = m === lastAssistant;
               return (
-                <li key={m.id} className="msg-in grid gap-2.5">
+                <li key={m.id} className="msg-in grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2.5">
                   {m.actions.map((a) => (
                     <ActionCard key={a.id} a={a} onDecide={decide} onScan={onScan} onPush={turnOnPush} onViewDashboard={onViewDashboard} />
                   ))}
@@ -400,14 +434,14 @@ export function CommandCenter(p: CommandCenterProps) {
                     body && <Bubble>{renderText(body)}</Bubble>
                   )}
                   {m.cards && m.cards.length > 0 && (
-                    <p className="flex w-fit items-start gap-1.5 rounded-2xl px-3 py-1.5 text-xs font-semibold text-iris" style={{ background: "var(--aurora-soft)" }}>
+                    <p className="flex w-fit max-w-full items-start gap-1.5 rounded-2xl px-3 py-1.5 text-xs font-semibold text-iris" style={{ background: "var(--aurora-soft)" }}>
                       <Sparkles size={13} /> Added to your dashboard: {m.cards.map((k) => CARDS[k].title).join(", ")}
                     </p>
                   )}
                   {isLast && !busy && choices.length > 0 && (
                     <div className="flex flex-wrap gap-2 pt-1">
                       {choices.map((c) => (
-                        <button key={c} className="choice" onClick={() => send(c)}>
+                        <button key={c} className="choice max-w-full whitespace-normal text-left" onClick={() => send(c)}>
                           {c}
                         </button>
                       ))}
@@ -483,7 +517,7 @@ export function CommandCenter(p: CommandCenterProps) {
 }
 
 function Bubble({ children }: { children: React.ReactNode }) {
-  return <div className="prose-chat max-w-[92%] text-[0.98rem] leading-relaxed text-ink">{children}</div>;
+  return <div className="prose-chat min-w-0 max-w-[92%] break-words [overflow-wrap:anywhere] text-[0.98rem] leading-relaxed text-ink">{children}</div>;
 }
 
 function ActionCard({

@@ -16,6 +16,15 @@ export const GET = route(async (ctx, req) => {
   return { conversation, conversations: conversations.map((c) => ({ id: c.id, title: c.title, updatedAt: c.updated_at.toISOString() })), model: configuredModel() };
 });
 
+/** DELETE {conversationId} → clear that chat. Messages go; jobs, shifts and money records stay. */
+export const DELETE = route(async (ctx, req) => {
+  const b = await body(req, z.object({ conversationId: zId }));
+  const { sql } = await import("@/lib/server/db");
+  const r = await sql`delete from ai_conversations where id = ${b.conversationId} and user_id = ${ctx.userId}`;
+  if (!r.count) throw new AppError("That chat is already gone.", 404);
+  return { ok: true };
+});
+
 const Turn = z.object({ text: z.string().min(1).max(4000), conversationId: zId.nullable().optional(), stream: z.boolean().optional() });
 
 /**
