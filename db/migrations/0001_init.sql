@@ -96,3 +96,26 @@ create table accounts (
   unique (id, user_id)
 );
 create index accounts_user_idx on accounts(user_id);
+
+create table paychecks (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null,
+  job_id uuid not null,
+  period_start date not null,
+  period_end date not null,
+  pay_date date not null,
+  expected_gross_cents bigint not null default 0 check (expected_gross_cents >= 0),
+  expected_net_cents bigint check (expected_net_cents >= 0),
+  actual_gross_cents bigint check (actual_gross_cents >= 0),
+  actual_net_cents bigint check (actual_net_cents >= 0),
+  status text not null default 'expected' check (status in ('expected','received')),
+  received_at timestamptz,
+  note text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  foreign key (job_id, user_id) references jobs(id, user_id) on delete cascade,
+  unique (id, user_id),
+  unique (job_id, period_start),
+  check (period_end >= period_start),
+  check (status <> 'received' or actual_net_cents is not null)
+);
