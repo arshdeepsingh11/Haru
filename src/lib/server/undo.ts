@@ -7,6 +7,7 @@ import { AppError } from "./errors";
 // always scoped to the acting user.
 
 const TABLES = new Set([
+  "user_memory",
   "jobs",
   "job_wages",
   "shifts",
