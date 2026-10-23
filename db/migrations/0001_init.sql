@@ -37,3 +37,32 @@ create table user_preferences (
   payday_notify_time time not null default '09:00',
   updated_at timestamptz not null default now()
 );
+
+-- ---------------------------------------------------------------------------
+-- Work
+-- ---------------------------------------------------------------------------
+create table jobs (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references app_users(id) on delete cascade,
+  employer text not null check (length(employer) between 1 and 120),
+  title text,
+  currency char(3) not null default 'CAD' check (currency ~ '^[A-Z]{3}$'),
+  status text not null default 'active' check (status in ('active','paused','ended')),
+  start_date date,
+  expected_weekly_minutes integer check (expected_weekly_minutes between 0 and 10080),
+  pay_frequency text check (pay_frequency in ('weekly','biweekly','semimonthly','monthly')),
+  period_anchor_date date,             -- first day of any known pay period (weekly/biweekly)
+  semimonthly_split_day smallint not null default 15 check (semimonthly_split_day between 1 and 27),
+  payday_offset_days smallint not null default 0 check (payday_offset_days between 0 and 31),
+  payday_weekend_rule text not null default 'none'
+    check (payday_weekend_rule in ('none','previous_business_day','next_business_day')),
+  deduction_percent numeric(5,2) check (deduction_percent >= 0 and deduction_percent < 100),
+  deduction_fixed_cents bigint check (deduction_fixed_cents >= 0),
+  regular_schedule jsonb not null default '[]'::jsonb,  -- [{weekday:0-6,start:"HH:MM",end:"HH:MM",break_minutes}]
+  notes text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (id, user_id),
+  check (pay_frequency not in ('weekly','biweekly') or period_anchor_date is not null)
+);
+create index jobs_user_idx on jobs(user_id);
