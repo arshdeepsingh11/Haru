@@ -326,3 +326,17 @@ create table push_subscriptions (
   created_at timestamptz not null default now()
 );
 create index push_subs_user_idx on push_subscriptions(user_id);
+
+create table notification_deliveries (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references app_users(id) on delete cascade,
+  reminder_id uuid references reminders(id) on delete cascade,
+  subscription_id uuid references push_subscriptions(id) on delete set null,
+  kind text not null default 'reminder' check (kind in ('reminder','test')),
+  status text not null check (status in ('accepted','failed','gone')),
+  http_status integer,
+  error text,
+  displayed_at timestamptz,             -- set when the service worker confirms it showed the notification
+  created_at timestamptz not null default now()
+);
+create index deliveries_user_idx on notification_deliveries(user_id, created_at desc);
