@@ -71,3 +71,10 @@ export function takeBudget(provider: string, perMinute: number): boolean {
   windows.set(provider, w);
   return true;
 }
+
+/** Drop every entry whose key starts with `prefix` (e.g. one person's cached AI insights). */
+export async function cacheDeletePrefix(prefix: string): Promise<number> {
+  for (const k of [...mem.keys()]) if (k.startsWith(prefix)) mem.delete(k);
+  const r = await sql`delete from market_cache where starts_with(key, ${prefix})`;
+  return r.count;
+}

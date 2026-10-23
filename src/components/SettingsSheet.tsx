@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Download, Loader2, LogOut } from "lucide-react";
-import { loadSettings, readNotifications, signOut, type SettingsData } from "@/app/actions";
+import { Brain, Download, Loader2, LogOut, RotateCcw, X } from "lucide-react";
+import { forgetMemory, freshStart, loadMemory, loadSettings, readNotifications, signOut, type SettingsData } from "@/app/actions";
 import { NotificationSettings } from "./Notifications";
 import { Empty, Sheet, useAct, useToast } from "./ui";
 
@@ -89,6 +89,8 @@ export function SettingsSheet({ open, onClose, vapidPublicKey }: { open: boolean
             </form>
           </section>
 
+          <HaruMemory />
+
           <section className="grid gap-3 border-t border-line pt-6">
             <h3 className="section-title">Your data</h3>
             <div className="flex flex-wrap gap-2">
@@ -125,6 +127,82 @@ export function SettingsSheet({ open, onClose, vapidPublicKey }: { open: boolean
         </div>
       )}
     </Sheet>
+  );
+}
+
+type Fact = Awaited<ReturnType<typeof loadMemory>>[number];
+
+/** What Haru remembers, with a way to remove anything wrong, and a fresh start that keeps your money records. */
+function HaruMemory() {
+  const toast = useToast();
+  const [facts, setFacts] = useState<Fact[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [wipeMemory, setWipeMemory] = useState(true);
+  const [wipeChats, setWipeChats] = useState(true);
+  const reload = useCallback(() => {
+    loadMemory().then(setFacts).catch(() => setFacts([]));
+  }, []);
+  useEffect(reload, [reload]);
+
+  return (
+    <section className="grid gap-3 border-t border-line pt-6">
+      <h3 className="section-title flex items-center gap-2">
+        <Brain size={16} /> What Haru remembers
+      </h3>
+      <p className="text-sm text-ink-2">Haru reads these on every message. Remove anything that's wrong or out of date.</p>
+      {!facts ? (
+        <p className="flex items-center gap-2 text-sm text-ink-3"><Loader2 size={14} className="animate-spin" /> Loading…</p>
+      ) : facts.length === 0 ? (
+        <p className="text-sm text-ink-3">Nothing yet. Haru saves corrections and preferences as you talk.</p>
+      ) : (
+        <ul className="grid gap-1.5">
+          {facts.map((f) => (
+            <li key={f.id} className="glass flex items-start gap-2 px-3 py-2 text-sm">
+              <span className="min-w-0 flex-1">{f.fact}</span>
+              <button
+                className="btn btn-quiet h-7 w-7 min-h-0 shrink-0 p-0"
+                aria-label={`Forget: ${f.fact}`}
+                onClick={async () => {
+                  const r = await forgetMemory(f.id);
+                  if (r.ok) setFacts((xs) => xs?.filter((x) => x.id !== f.id) ?? null);
+                  else toast(r.error, "error");
+                }}
+              >
+                <X size={14} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <details className="mt-1">
+        <summary className="cursor-pointer text-sm font-semibold">Fresh start for Haru</summary>
+        <div className="mt-3 grid gap-2.5">
+          <p className="text-sm text-ink-2">Clears what Haru learned and your old chats, so earlier mistakes can't come back. Your jobs, shifts, bills and balances are kept.</p>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={wipeMemory} onChange={(e) => setWipeMemory(e.target.checked)} /> Forget everything Haru remembers
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={wipeChats} onChange={(e) => setWipeChats(e.target.checked)} /> Delete chat history
+          </label>
+          <button
+            className="btn btn-line w-fit"
+            disabled={busy || (!wipeMemory && !wipeChats)}
+            onClick={async () => {
+              setBusy(true);
+              const r = await freshStart({ memory: wipeMemory, chats: wipeChats });
+              setBusy(false);
+              toast(r.ok ? r.summary : r.error, r.ok ? "ok" : "error");
+              if (r.ok) {
+                reload();
+                if (wipeChats) window.location.reload();
+              }
+            }}
+          >
+            {busy ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />} Start fresh
+          </button>
+        </div>
+      </details>
+    </section>
   );
 }
 

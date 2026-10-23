@@ -110,6 +110,45 @@ export async function editCards(input: { add?: string[]; remove?: string[]; orde
     return { ok: false, error: publicMessage(e) };
   }
 }
+/** What Haru remembers about you, so you can remove anything wrong or outdated. */
+export async function loadMemory() {
+  const ctx = await requireCtx();
+  const { listMemory } = await import("@/lib/server/services/memory");
+  return listMemory(ctx, 60);
+}
+export async function forgetMemory(id: number): Promise<ActionResult> {
+  return simple(async (ctx) => {
+    if (!Number.isSafeInteger(id) || id <= 0) throw new AppError("Invalid id");
+    const { forget } = await import("@/lib/server/services/memory");
+    await forget(ctx, id);
+  });
+}
+/**
+ * A fresh start for Haru without touching your money records: forget learned facts, clear chats
+ * (old replies can repeat old mistakes), and drop cached AI insights. Jobs, shifts and balances stay.
+ */
+export async function freshStart(input: { memory?: boolean; chats?: boolean }): Promise<ActionResult> {
+  try {
+    const ctx = await requireCtx();
+    const done: string[] = [];
+    if (input.memory) {
+      const { forgetAll } = await import("@/lib/server/services/memory");
+      done.push(`${await forgetAll(ctx)} remembered facts`);
+    }
+    if (input.chats) {
+      const r = await sql`delete from ai_conversations where user_id = ${ctx.userId}`;
+      done.push(`${r.count} conversations`);
+    }
+    const { cacheDeletePrefix } = await import("@/lib/server/invest/cache");
+    await cacheDeletePrefix(`insight:${ctx.userId}:`).catch((e) => logError("freshStart.cache", e));
+    revalidatePath("/");
+    return { ok: true, summary: done.length ? `Cleared ${done.join(" and ")}.` : "Cleared Haru's cached insights." };
+  } catch (e) {
+    if (!(e instanceof AppError)) logError("action.freshStart", e);
+    return { ok: false, error: publicMessage(e) };
+  }
+}
+
 export async function signOut() {
   const { supabaseServer } = await import("@/lib/server/context");
   const sb = await supabaseServer();

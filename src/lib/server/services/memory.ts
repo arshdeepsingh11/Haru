@@ -48,3 +48,8 @@ export async function forget(ctx: Ctx, id: number): Promise<string> {
   if (!r) throw new AppError("That memory no longer exists.", 404);
   return r.fact;
 }
+
+export async function forgetAll(ctx: Ctx): Promise<number> {
+  const r = await sql`delete from user_memory where user_id = ${ctx.userId}`;
+  return r.count;
+}
