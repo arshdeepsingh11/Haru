@@ -119,3 +119,32 @@ create table paychecks (
   check (period_end >= period_start),
   check (status <> 'received' or actual_net_cents is not null)
 );
+
+create table shifts (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null,
+  job_id uuid not null,
+  work_date date not null,
+  starts_at timestamptz,
+  ends_at timestamptz,
+  break_minutes integer not null default 0 check (break_minutes between 0 and 1440),
+  paid_minutes integer not null check (paid_minutes between 0 and 1440),
+  rate_cents integer not null check (rate_cents >= 0),        -- snapshot of the wage used
+  gross_cents bigint not null check (gross_cents >= 0),       -- snapshot: round(paid_minutes*rate/60)
+  status text not null default 'completed' check (status in ('scheduled','completed','cancelled')),
+  source text not null default 'manual' check (source in ('manual','ai','schedule')),
+  paycheck_id uuid,
+  notes text,
+  revised_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  foreign key (job_id, user_id) references jobs(id, user_id) on delete cascade,
+  foreign key (paycheck_id, user_id) references paychecks(id, user_id) on delete set null (paycheck_id),
+  unique (id, user_id),
+  check (ends_at is null or starts_at is null or ends_at > starts_at),
+  check (gross_cents = round(paid_minutes::numeric * rate_cents / 60))
+);
+create index shifts_user_date_idx on shifts(user_id, work_date);
+create index shifts_job_date_idx on shifts(job_id, work_date);
+-- Shifts generated from a job's regular schedule are materialised idempotently.
+create unique index shifts_schedule_once on shifts(job_id, work_date, starts_at) where source = 'schedule';
