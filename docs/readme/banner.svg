@@ -1,16 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="520" viewBox="0 0 1280 520" role="img" aria-label="HARU — every shift has a number">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f7f8fd"/><stop offset="1" stop-color="#eef1fa"/></linearGradient>
-    <radialGradient id="l1" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#6e56ff" stop-opacity=".22"/><stop offset="1" stop-color="#6e56ff" stop-opacity="0"/></radialGradient>
-    <radialGradient id="l2" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#2bc8e8" stop-opacity=".22"/><stop offset="1" stop-color="#2bc8e8" stop-opacity="0"/></radialGradient>
-    <radialGradient id="l3" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#ff6fb5" stop-opacity=".18"/><stop offset="1" stop-color="#ff6fb5" stop-opacity="0"/></radialGradient>
-    <radialGradient id="orbBase" cx="0.5" cy="0.55" r="0.55"><stop offset="0" stop-color="#b9adff"/><stop offset=".5" stop-color="#8c7bff"/><stop offset="1" stop-color="#6e56ff"/></radialGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f6f4f3"/><stop offset="1" stop-color="#ebe7e4"/></linearGradient>
+    <radialGradient id="l1" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#8a6a2f" stop-opacity=".22"/><stop offset="1" stop-color="#8a6a2f" stop-opacity="0"/></radialGradient>
+    <radialGradient id="l2" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#9aa3a8" stop-opacity=".22"/><stop offset="1" stop-color="#9aa3a8" stop-opacity="0"/></radialGradient>
+    <radialGradient id="l3" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#d9a48f" stop-opacity=".18"/><stop offset="1" stop-color="#d9a48f" stop-opacity="0"/></radialGradient>
+    <radialGradient id="orbBase" cx="0.5" cy="0.55" r="0.55"><stop offset="0" stop-color="#f3e3c2"/><stop offset=".5" stop-color="#c9a464"/><stop offset="1" stop-color="#8a6a2f"/></radialGradient>
     <radialGradient id="sheen" cx="0.32" cy="0.26" r="0.45"><stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset=".4" stop-color="#fff" stop-opacity=".3"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
     <filter id="blur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="22"/></filter>
     <filter id="halo" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="36"/></filter>
     <clipPath id="orbClip"><circle cx="960" cy="260" r="150"/></clipPath>
-    <linearGradient id="aur" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#6e56ff"/><stop offset=".45" stop-color="#4f8bff"/><stop offset=".75" stop-color="#2bc8e8"/><stop offset="1" stop-color="#ff6fb5"/></linearGradient>
-    <linearGradient id="edge" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6e56ff"/><stop offset=".6" stop-color="#2bc8e8"/><stop offset="1" stop-color="#ff6fb5"/></linearGradient>
+    <linearGradient id="aur" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8a6a2f"/><stop offset=".45" stop-color="#c9a464"/><stop offset=".75" stop-color="#9aa3a8"/><stop offset="1" stop-color="#d9a48f"/></linearGradient>
+    <linearGradient id="edge" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8a6a2f"/><stop offset=".6" stop-color="#9aa3a8"/><stop offset="1" stop-color="#d9a48f"/></linearGradient>
   </defs>
   <style>
     .t{font-family:'Segoe UI',Helvetica,Arial,sans-serif}
@@ -26,16 +26,16 @@
   </style>
   <rect width="1280" height="520" rx="32" fill="url(#bg)"/>
   <g class="drift"><circle cx="220" cy="80" r="300" fill="url(#l1)"/><circle cx="1180" cy="120" r="280" fill="url(#l2)"/><circle cx="760" cy="520" r="300" fill="url(#l3)"/></g>
-  <rect x="1" y="1" width="1278" height="518" rx="31" fill="none" stroke="#12142b" stroke-opacity=".06"/>
+  <rect x="1" y="1" width="1278" height="518" rx="31" fill="none" stroke="#26292b" stroke-opacity=".06"/>
 
   <!-- Aurora orb -->
-  <circle cx="960" cy="270" r="190" fill="#6e56ff" opacity=".28" filter="url(#halo)" class="breathe"/>
+  <circle cx="960" cy="270" r="190" fill="#8a6a2f" opacity=".28" filter="url(#halo)" class="breathe"/>
   <g class="breathe">
     <circle cx="960" cy="260" r="150" fill="url(#orbBase)"/>
     <g clip-path="url(#orbClip)" filter="url(#blur)">
-      <g class="spin1"><circle cx="1010" cy="230" r="95" fill="#2bc8e8"/></g>
-      <g class="spin2"><circle cx="910" cy="300" r="105" fill="#ff6fb5" opacity=".9"/></g>
-      <g class="spin3"><circle cx="960" cy="200" r="70" fill="#9bf2ff"/></g>
+      <g class="spin1"><circle cx="1010" cy="230" r="95" fill="#9aa3a8"/></g>
+      <g class="spin2"><circle cx="910" cy="300" r="105" fill="#d9a48f" opacity=".9"/></g>
+      <g class="spin3"><circle cx="960" cy="200" r="70" fill="#e8ecee"/></g>
     </g>
     <circle cx="960" cy="260" r="150" fill="url(#sheen)"/>
     <circle cx="960" cy="260" r="149" fill="none" stroke="#fff" stroke-opacity=".6"/>
@@ -45,35 +45,32 @@
   <g transform="translate(96 112)">
     <g transform="scale(0.875)">
   <defs>
-    <linearGradient id="bnt" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6e56ff"/><stop offset=".55" stop-color="#4b6dff"/><stop offset="1" stop-color="#1fb6dc"/></linearGradient>
-    <radialGradient id="bng" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff"/><stop offset=".35" stop-color="#e3faff" stop-opacity=".8"/><stop offset="1" stop-color="#9bf2ff" stop-opacity="0"/></radialGradient>
-    <radialGradient id="bns" cx=".25" cy=".15" r=".9"><stop offset="0" stop-color="#fff" stop-opacity=".3"/><stop offset=".55" stop-color="#fff" stop-opacity="0"/></radialGradient>
+    <linearGradient id="bnt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#585c5e"/><stop offset="1" stop-color="#3a3e40"/></linearGradient>
+    <linearGradient id="bnc" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#c9a464"/><stop offset=".6" stop-color="#ead2a1"/><stop offset="1" stop-color="#fbf1dc"/></linearGradient>
+    <radialGradient id="bns" cx=".3" cy=".1" r=".9"><stop offset="0" stop-color="#fff" stop-opacity=".16"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/></radialGradient>
   </defs>
-  <rect width="64" height="64" rx="16" fill="url(#bnt)"/><rect width="64" height="64" rx="16" fill="url(#bns)"/>
-  <g fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M32.2 10.5v4.3" stroke-width="5"/>
-    <path d="M32.2 54.6v-3.3" stroke-width="5"/>
-    <path d="M43 22.6c-1.9-3.1-5.6-5-10.6-5-6.5 0-11 3.2-11 8.2 0 4.8 3.7 6.8 11 8.2" pathLength="100" stroke-width="5.6" stroke-linecap="butt" stroke-dasharray="15 5.5 38 5.5 22 100"/>
-    <path d="M32.4 34c7.5 1.4 11.6 3.6 11.6 8.8 0 5.2-4.8 8.7-11.6 8.7-5.4 0-9.7-2.2-11.5-5.8" pathLength="100" stroke-width="5.6" stroke-dasharray="0 14 86 100"/>
+  <rect width="64" height="64" rx="16" fill="url(#bnt)"/><rect width="64" height="64" rx="16" fill="url(#bns)"/><rect x=".5" y=".5" width="63" height="63" rx="15.5" fill="none" stroke="#fff" stroke-opacity=".1"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M19 17v30M45 17v30" stroke="#f3f1f0" stroke-width="6.2"/>
+    <path d="M19 38.5 L27 33.5 L32.5 36 L45 25" stroke="url(#bnc)" stroke-width="6.2"/>
   </g>
-  <circle cx="32.3" cy="33.4" r="7.5" fill="url(#bng)"/>
-  <path d="M32.3 29.2 L33.05 32.65 L36.5 33.4 L33.05 34.15 L32.3 37.6 L31.55 34.15 L28.1 33.4 L31.55 32.65 Z" fill="#fff"/></g>
-    <text x="74" y="39" class="t" font-size="28" font-weight="700" letter-spacing="4" fill="#12142b">HARU</text>
+  <path d="M51.5 7.5 L52.7 12.3 L57.5 13.5 L52.7 14.7 L51.5 19.5 L50.3 14.7 L45.5 13.5 L50.3 12.3 Z" fill="#f1dcb1"/></g>
+    <text x="74" y="39" class="t" font-size="28" font-weight="700" letter-spacing="4" fill="#26292b">HARU</text>
   </g>
-  <text x="96" y="262" class="t" font-size="58" font-weight="700" fill="#12142b" letter-spacing="-1.5">Every shift</text>
+  <text x="96" y="262" class="t" font-size="58" font-weight="700" fill="#26292b" letter-spacing="-1.5">Every shift</text>
   <text x="96" y="328" class="t" font-size="58" font-weight="700" fill="url(#aur)" letter-spacing="-1.5">has a number.</text>
-  <text x="98" y="378" class="t" font-size="21" fill="#5b6282">An AI money coach for people who work shifts.</text>
-  <text x="98" y="408" class="t" font-size="21" fill="#5b6282">Talk to it, and it builds your dashboard.</text>
+  <text x="98" y="378" class="t" font-size="21" fill="#5d6164">An AI money coach for people who work shifts.</text>
+  <text x="98" y="408" class="t" font-size="21" fill="#5d6164">Talk to it, and it builds your dashboard.</text>
 
   <!-- Floating chip: next shift -->
   <g transform="translate(1090 400)">
-    <rect width="160" height="64" rx="20" fill="#fff" stroke="#12142b" stroke-opacity=".06"/>
-    <text x="18" y="26" class="t" font-size="13" fill="#969cb4">Next shift</text>
+    <rect width="160" height="64" rx="20" fill="#fff" stroke="#26292b" stroke-opacity=".06"/>
+    <text x="18" y="26" class="t" font-size="13" fill="#8f9497">Next shift</text>
     <text x="18" y="50" class="t" font-size="22" font-weight="700" fill="url(#aur)">+$146.30</text>
   </g>
   <g transform="translate(700 70)">
-    <rect width="150" height="44" rx="22" fill="#fff" stroke="#12142b" stroke-opacity=".06"/>
+    <rect width="150" height="44" rx="22" fill="#fff" stroke="#26292b" stroke-opacity=".06"/>
     <circle cx="24" cy="22" r="7" fill="url(#edge)"/>
-    <text x="40" y="28" class="t" font-size="15" font-weight="600" fill="#12142b">4 days sooner</text>
+    <text x="40" y="28" class="t" font-size="15" font-weight="600" fill="#26292b">4 days sooner</text>
   </g>
 </svg>
