@@ -412,3 +412,10 @@ create table behavior_observations (
   updated_at timestamptz not null default now(),
   unique (user_id, kind)
 );
+
+create table dashboard_preferences (
+  user_id uuid primary key references app_users(id) on delete cascade,
+  layout jsonb not null default '[]'::jsonb,       -- [{key, hidden?, pinned?}] in display order
+  previous_layout jsonb,
+  updated_at timestamptz not null default now()
+);
