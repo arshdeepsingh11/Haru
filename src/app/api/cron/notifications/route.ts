@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { runScheduler } from "@/lib/server/notifications/scheduler";
 import { logError } from "@/lib/server/errors";
+import { refreshNewsIfStale } from "@/lib/server/invest/news";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,6 +23,8 @@ async function handle(req: Request) {
   if (!authorised(req)) return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
   try {
     const result = await runScheduler();
+    // Headlines for the Invest tab refresh every 15 minutes on the same heartbeat.
+    await refreshNewsIfStale(8000).catch((e) => logError("cron.news", e));
     return NextResponse.json({ ok: true, ...result });
   } catch (e) {
     logError("cron", e);
