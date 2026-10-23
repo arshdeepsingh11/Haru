@@ -1,14 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Bell, FolderOpen, MessageSquareText, Settings } from "lucide-react";
+import { Bell, CalendarDays, FolderOpen, MessageSquareText, Settings } from "lucide-react";
 import type { DashboardData } from "@/lib/server/services/dashboard";
 import { Wordmark } from "./Wordmark";
 import { Dashboard } from "./dashboard/Dashboard";
 import { CommandCenter } from "./CommandCenter";
 import { RecordsSheet } from "./RecordsSheet";
 import { InboxSheet, SettingsSheet } from "./SettingsSheet";
-import { CurrencyProvider, ToastProvider } from "./ui";
+import { ScheduleSheet } from "./ScheduleSheet";
+import { CheckoutCard } from "./home/ShiftHome";
+import { CurrencyProvider, Sheet, ToastProvider } from "./ui";
 
 const ASK_PREFILL: Record<string, string> = {
   log: "I worked ",
@@ -19,19 +21,23 @@ export function AppShell({
   data,
   initialAsk,
   initialSheet,
+  initialCheckout,
   vapidPublicKey,
   aiConfigured,
 }: {
   data: DashboardData;
   email: string | null;
   initialAsk: string | null;
-  initialSheet: "settings" | null;
+  initialSheet: "settings" | "schedule" | null;
+  initialCheckout?: string | null;
   vapidPublicKey: string | null;
   aiConfigured: boolean;
 }) {
   const [chatOpen, setChatOpen] = useState(Boolean(initialAsk));
   const [prefill, setPrefill] = useState<string | null>(initialAsk ? (ASK_PREFILL[initialAsk] ?? null) : null);
-  const [sheet, setSheet] = useState<"records" | "settings" | "inbox" | null>(initialSheet);
+  const [sheet, setSheet] = useState<"records" | "settings" | "inbox" | "schedule" | null>(initialSheet);
+  const checkout = initialCheckout ? data.coach.checkouts.find((c) => c.id === initialCheckout) ?? null : null;
+  const [checkoutOpen, setCheckoutOpen] = useState(Boolean(checkout));
   const [recordsTab, setRecordsTab] = useState<string | null>(null);
 
   const ask = useCallback((text: string) => {
@@ -66,6 +72,9 @@ export function AppShell({
                 <a href="/" className="mr-auto" aria-label="HARU home">
                   <Wordmark />
                 </a>
+                <button className="btn btn-quiet px-2.5" onClick={() => setSheet("schedule")} aria-label="Schedule">
+                  <CalendarDays size={18} /> <span className="hidden sm:inline">Schedule</span>
+                </button>
                 <button className="btn btn-quiet px-2.5" onClick={() => openRecords()} aria-label="Records">
                   <FolderOpen size={18} /> <span className="hidden sm:inline">Records</span>
                 </button>
@@ -79,8 +88,8 @@ export function AppShell({
               </div>
             </header>
             <main className="mx-auto max-w-3xl px-4 pb-32 pt-6 lg:pb-16">
-              <Dashboard data={data} onAsk={ask} onOpenRecords={openRecords} />
-              <footer className="mt-12 text-xs text-ink-3">HARU — Work for Haru.</footer>
+              <Dashboard data={data} onAsk={ask} onOpenRecords={openRecords} onOpenSchedule={() => setSheet("schedule")} />
+              <footer className="mt-12 text-xs text-ink-3">HARU, Work for Haru.</footer>
             </main>
           </div>
 
@@ -106,6 +115,12 @@ export function AppShell({
         <RecordsSheet open={sheet === "records"} onClose={() => setSheet(null)} initialTab={recordsTab} />
         <SettingsSheet open={sheet === "settings"} onClose={() => setSheet(null)} vapidPublicKey={vapidPublicKey} />
         <InboxSheet open={sheet === "inbox"} onClose={() => setSheet(null)} />
+        <ScheduleSheet open={sheet === "schedule"} onClose={() => setSheet(null)} />
+        {checkout && (
+          <Sheet open={checkoutOpen} onClose={() => setCheckoutOpen(false)} title="Check out of your shift">
+            <CheckoutCard s={checkout} today={data.today} taxPercent={data.coach.taxPercent} autoFocus />
+          </Sheet>
+        )}
       </ToastProvider>
     </CurrencyProvider>
   );

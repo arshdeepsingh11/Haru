@@ -16,6 +16,7 @@ import {
 } from "@/lib/server/services/finance";
 import { cancelReminder, createReminder, markNotificationsRead } from "@/lib/server/services/reminders";
 import { completeOnboarding, updatePrefs } from "@/lib/server/services/prefs";
+import { checkoutShift, setAttendance, takeHome } from "@/lib/server/services/shiftloop";
 import { setObservationStatus } from "@/lib/server/services/observations";
 import type { Ctx } from "@/lib/server/context";
 import type { ServiceResult } from "@/lib/server/services/jobs";
@@ -47,6 +48,8 @@ const ACTIONS = {
   contributeToGoal: { schema: V.GoalContribution, run: (c: Ctx, a: z.infer<typeof V.GoalContribution>) => contributeToGoal(c, a, "user") },
   createReminder: { schema: V.ReminderCreate, run: (c: Ctx, a: z.infer<typeof V.ReminderCreate>) => createReminder(c, a, "user") },
   updatePrefs: { schema: V.PrefsUpdate, run: (c: Ctx, a: V.PrefsUpdate) => updatePrefs(c, a, "user") },
+  setAttendance: { schema: V.ShiftAttendance, run: (c: Ctx, a: z.infer<typeof V.ShiftAttendance>) => setAttendance(c, a.shift_id, a.going, "user") },
+  checkoutShift: { schema: V.ShiftCheckout, run: (c: Ctx, a: z.infer<typeof V.ShiftCheckout>) => checkoutShift(c, a.shift_id, a, "user") },
 } as const;
 
 export type ActionKind = keyof typeof ACTIONS;
@@ -170,3 +173,44 @@ export async function loadSettings() {
   };
 }
 export type SettingsData = Awaited<ReturnType<typeof loadSettings>>;
+
+/** One week of shifts (and one-time work) for the Schedule view. */
+export async function loadSchedule(weekStart?: string) {
+  const ctx = await requireCtx();
+  const { listJobs, jobLabel } = await import("@/lib/server/services/jobs");
+  const { listShifts, materializeSchedules } = await import("@/lib/server/services/shifts");
+  const { listOpportunities } = await import("@/lib/server/services/opportunities");
+  const { addDays, startOfWeek, isISODate, localTime } = await import("@/lib/domain/time");
+  await materializeSchedules(ctx, 21).catch(() => 0);
+  const start = weekStart && isISODate(weekStart) ? startOfWeek(weekStart, ctx.prefs.week_starts_on) : startOfWeek(ctx.today, ctx.prefs.week_starts_on);
+  const end = addDays(start, 6);
+  const [jobs, shifts, opps] = await Promise.all([listJobs(ctx), listShifts(ctx, { start, end }), listOpportunities(ctx)]);
+  return {
+    today: ctx.today,
+    start,
+    end,
+    currency: ctx.currency,
+    taxPercent: ctx.prefs.reserve_percent,
+    jobs: jobs.map((j, i) => ({ id: j.id, name: jobLabel(j), employer: j.employer, rateCents: j.current_rate_cents, color: i, schedule: j.regular_schedule })),
+    shifts: shifts
+      .filter((s) => s.status !== "cancelled")
+      .map((s) => ({
+        id: s.id,
+        jobId: s.job_id,
+        jobName: s.job_name,
+        date: s.work_date,
+        start: s.starts_at ? localTime(s.starts_at, ctx.tz) : null,
+        end: s.ends_at ? localTime(s.ends_at, ctx.tz) : null,
+        minutes: s.paid_minutes,
+        grossCents: s.gross_cents,
+        takeHomeCents: takeHome(ctx, s.gross_cents),
+        status: s.status,
+        attendance: s.attendance,
+        ended: s.ends_at ? s.ends_at.getTime() < Date.now() : s.work_date < ctx.today,
+      })),
+    extras: opps
+      .filter((o) => o.work_date && o.work_date >= start && o.work_date <= end && o.status !== "declined")
+      .map((o) => ({ id: o.id, name: o.name, date: o.work_date!, offeredCents: o.offered_cents, minutes: o.expected_minutes, status: o.status, start: o.starts_at ? localTime(o.starts_at, ctx.tz) : null })),
+  };
+}
+export type ScheduleData = Awaited<ReturnType<typeof loadSchedule>>;

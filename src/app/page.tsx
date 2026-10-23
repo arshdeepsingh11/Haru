@@ -5,6 +5,7 @@ import { materializeSchedules } from "@/lib/server/services/shifts";
 import { refreshObservations } from "@/lib/server/services/observations";
 import { logError, publicMessage } from "@/lib/server/errors";
 import { AppShell } from "@/components/AppShell";
+import { aiConfigured } from "@/lib/ai/provider";
 import { Wordmark } from "@/components/Wordmark";
 
 export const dynamic = "force-dynamic";
@@ -31,9 +32,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
         data={data}
         email={ctx.email}
         initialAsk={sp.ask ?? null}
-        initialSheet={sp.settings ? "settings" : null}
+        initialSheet={sp.settings ? "settings" : sp.schedule ? "schedule" : null}
+        initialCheckout={sp.checkout ?? null}
         vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null}
-        aiConfigured={Boolean(process.env.ANTHROPIC_API_KEY)}
+        aiConfigured={aiConfigured()}
       />
     );
   } catch (e) {
