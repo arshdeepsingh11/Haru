@@ -4,15 +4,15 @@
 
 <br />
 
-<img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-12142b?style=for-the-badge&logo=nextdotjs&logoColor=white" />
-<img alt="React 19" src="https://img.shields.io/badge/React-19-6e56ff?style=for-the-badge&logo=react&logoColor=white" />
-<img alt="TypeScript strict" src="https://img.shields.io/badge/TypeScript-strict-4f8bff?style=for-the-badge&logo=typescript&logoColor=white" />
-<img alt="Supabase Postgres" src="https://img.shields.io/badge/Supabase-Postgres-2bc8e8?style=for-the-badge&logo=supabase&logoColor=white" />
+<img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-26292b?style=for-the-badge&logo=nextdotjs&logoColor=white" />
+<img alt="React 19" src="https://img.shields.io/badge/React-19-8a6a2f?style=for-the-badge&logo=react&logoColor=white" />
+<img alt="TypeScript strict" src="https://img.shields.io/badge/TypeScript-strict-494d4f?style=for-the-badge&logo=typescript&logoColor=white" />
+<img alt="Supabase Postgres" src="https://img.shields.io/badge/Supabase-Postgres-c9a464?style=for-the-badge&logo=supabase&logoColor=white" />
 <br />
-<img alt="Gemini with fallback" src="https://img.shields.io/badge/AI-Gemini%20%2B%20fallback-ff6fb5?style=for-the-badge&logo=googlegemini&logoColor=white" />
-<img alt="Web Push" src="https://img.shields.io/badge/Web%20Push-VAPID-12142b?style=for-the-badge&logo=pwa&logoColor=white" />
-<img alt="Tests" src="https://img.shields.io/badge/tests-75%20passing-6e56ff?style=for-the-badge" />
-<img alt="PWA" src="https://img.shields.io/badge/phone--first-PWA-2bc8e8?style=for-the-badge" />
+<img alt="Gemini with fallback" src="https://img.shields.io/badge/AI-Gemini%20%2B%20fallback-494d4f?style=for-the-badge&logo=googlegemini&logoColor=white" />
+<img alt="Web Push" src="https://img.shields.io/badge/Web%20Push-VAPID-26292b?style=for-the-badge&logo=pwa&logoColor=white" />
+<img alt="Tests" src="https://img.shields.io/badge/tests-94%20passing-8a6a2f?style=for-the-badge" />
+<img alt="PWA" src="https://img.shields.io/badge/phone--first-PWA-c9a464?style=for-the-badge" />
 
 <h3>Work for Haru.</h3>
 
@@ -118,6 +118,17 @@ days closer = shift take-home ÷ (monthly surplus ÷ 30.44)
 - **You see it working.** Each step streams to the chat as it happens ("Saving your job ✓", "Adding Rent ✓"), and big messages are saved in one go.
 - **Busy servers don't stall you.** If Gemini is overloaded (503) or out of quota (429), Haru retries and then falls back through `gemini-3.8-flash → 3.6-flash → 2.5-flash`, re-signing tool-call history so the switch is safe. If every model is busy, nothing is stored and you get a **Retry** button.
 
+### 7. Invest: one tab for India, Canada and the world
+
+Pick a country, tick what you care about (stocks, ETFs, gold, silver, mutual funds, GICs, crypto, currency, real estate, land, shops), and the tab builds itself around you:
+
+- **Real prices, labelled honestly.** Every number shows where it came from and how fresh it is: *Live*, *15 min delayed*, *Close, Oct 22* or *Official (Bank of Canada)*. Nothing is ever made up. Gold per 10 g in rupees is computed from gold in dollars × USD/INR.
+- **Charts like a trading site.** 1D to Max, line or candles, drag a finger for the price on any day.
+- **Numbers by code, words by AI.** Returns, 5-year CAGR, 52-week range, swings and drawdown are calculated, then Haru writes a short take that also looks at your budget and debts. It always says: *this is an AI estimate, I may be wrong, not financial advice.*
+- **News that matches you.** The Economic Times, Mint, BusinessLine, Aaj Tak, CBC, Financial Post, The Globe and Mail, The New York Times, The Washington Post and BBC, tagged to countries, interests and assets, refreshed every 15 minutes.
+- **It learns.** What you open, save and ask about shapes what you see first, with a three-week memory.
+- **Things without a live price** (land, shops, real estate, deposits) get context, news and Haru's take instead of fake numbers.
+
 ## Under the hood
 
 <img src="docs/readme/glance.svg" alt="HARU at a glance" width="100%" />
@@ -150,7 +161,7 @@ flowchart LR
 | Layer | Choices |
 |---|---|
 | App | Next.js 16 App Router, React 19, server actions, strict TypeScript |
-| Look | Light aurora glass. Unbounded for money figures, Geist for text. One animated orb is Haru's presence: it drifts when idle, swirls while thinking and breathes when it answers |
+| Look | Stone #F3F1F0 background with charcoal #494D4F glass and champagne accents. Unbounded for money figures, Geist for text. One animated orb is Haru's presence: it drifts when idle, swirls while thinking and breathes when it answers |
 | Data | Supabase Postgres via postgres.js, row-level security on with no public access, money in cents |
 | AI | Provider-neutral adapter (Gemini REST or Anthropic SDK), Zod → JSON Schema tools, vision for schedules |
 | Notifications | Web Push (VAPID), durable reminder queue with dedupe keys, `FOR UPDATE SKIP LOCKED`, retries, delivery receipts |
@@ -160,12 +171,12 @@ flowchart LR
 
 ```bash
 npm install
-cp .env.example .env.local        # Supabase URL + anon key, DATABASE_URL, GEMINI_API_KEY, VAPID keys
-npm run db:migrate                # 0001 init · 0002 shift loop · 0003 AI-built dashboard
+cp .env.example .env.local        # Supabase, DATABASE_URL, GEMINI_API_KEY, VAPID, market data keys
+npm run db:migrate                # 0001 … 0006 (invest)
 npm run dev
 ```
 
-`npm test` runs the domain, Gemini and tool-schema tests. `npm run test:integration` runs the end-to-end suite against a throwaway Postgres.
+`npm test` runs the domain, invest, Gemini and tool-schema tests. `npm run test:integration` runs the end-to-end suite against a throwaway Postgres.
 
 <div align="center">
 <br />
