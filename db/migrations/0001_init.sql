@@ -340,3 +340,14 @@ create table notification_deliveries (
   created_at timestamptz not null default now()
 );
 create index deliveries_user_idx on notification_deliveries(user_id, created_at desc);
+
+create table scheduler_runs (
+  id bigserial primary key,
+  started_at timestamptz not null default now(),
+  finished_at timestamptz,
+  planned integer not null default 0,
+  claimed integer not null default 0,
+  delivered integer not null default 0,
+  failed integer not null default 0,
+  error text
+);
