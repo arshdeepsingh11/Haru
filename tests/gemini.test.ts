@@ -60,6 +60,43 @@ test("gemini: free-tier limit and bad key fail honestly", async () => {
 test("gemini: unknown model and other errors show Google's reason", async () => {
   const missing = new GeminiProvider("k", "gemini-9", fakeFetch([{ status: 404, body: JSON.stringify({ error: { message: "models/gemini-9 is not found" } }) }], []));
   await assert.rejects(missing.chat({ system: "", messages: [], tools }), /isn't available to this key/);
-  const other = new GeminiProvider("k", "m", fakeFetch([{ status: 500, body: JSON.stringify({ error: { message: "Internal error" } }) }], []));
-  await assert.rejects(other.chat({ system: "", messages: [], tools }), /Gemini error 500: Internal error/);
+  const other = new GeminiProvider("k", "m", fakeFetch([{ status: 400, body: JSON.stringify({ error: { message: "Bad request thing" } }) }], []));
+  await assert.rejects(other.chat({ system: "", messages: [], tools }), /Gemini error 400: Bad request thing/);
+});
+
+const ok = { status: 200, body: { candidates: [{ content: { parts: [{ text: "Hi" }] }, finishReason: "STOP" }] } };
+const busy = { status: 503, body: JSON.stringify({ error: { message: "This model is currently experiencing high demand." } }) };
+
+test("gemini: a brief 503 is retried on the same model", async () => {
+  const seen: { url: string; body: any; headers: any }[] = [];
+  const p = new GeminiProvider("k", "main", fakeFetch([busy, ok], seen), { retryDelaysMs: [0, 0] });
+  const r = await p.chat({ system: "", messages: [{ role: "user", content: [{ type: "text", text: "hey" }] }], tools });
+  assert.equal(r.content[0].type, "text");
+  assert.equal(seen.length, 2);
+  assert.ok(seen.every((x) => x.url.includes("/main:")));
+});
+
+test("gemini: overloaded model falls back to the next, which stays in use, with signatures re-signed", async () => {
+  const seen: { url: string; body: any; headers: any }[] = [];
+  const p = new GeminiProvider("k", "main", fakeFetch([busy, busy, busy, ok, ok], seen), { fallbacks: ["backup"], retryDelaysMs: [0, 0] });
+  const messages: ChatMessage[] = [
+    { role: "user", content: [{ type: "text", text: "I spent $42" }] },
+    { role: "assistant", content: [{ type: "tool_call", id: "c1", name: "create_expense", input: { amount: 42 }, signature: "REAL" }] },
+    { role: "user", content: [{ type: "tool_result", id: "c1", content: "{}" }] },
+  ];
+  await p.chat({ system: "", messages, tools });
+  assert.deepEqual(seen.map((x) => x.url.split("/models/")[1].split(":")[0]), ["main", "main", "main", "backup"]);
+  assert.equal(seen[3].body.contents[1].parts[0].thoughtSignature, "skip_thought_signature_validator");
+  assert.equal(p.modelInUse, "backup");
+  await p.chat({ system: "", messages: [{ role: "user", content: [{ type: "text", text: "again" }] }], tools });
+  assert.match(seen[4].url, /\/backup:/);
+});
+
+test("gemini: quota on one model moves on; all busy says so plainly", async () => {
+  const seen: { url: string; body: any; headers: any }[] = [];
+  const p = new GeminiProvider("k", "main", fakeFetch([{ status: 429, body: "quota" }, ok], seen), { fallbacks: ["backup"], retryDelaysMs: [] });
+  await p.chat({ system: "", messages: [], tools });
+  assert.match(seen[1].url, /\/backup:/);
+  const all = new GeminiProvider("k", "main", fakeFetch([busy], []), { fallbacks: ["b2"], retryDelaysMs: [0] });
+  await assert.rejects(all.chat({ system: "", messages: [], tools }), (e: unknown) => e instanceof ProviderUnavailable && /overloaded right now \(tried main, b2\)/.test((e as Error).message));
 });
