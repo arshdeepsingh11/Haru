@@ -351,3 +351,15 @@ create table scheduler_runs (
   failed integer not null default 0,
   error text
 );
+
+-- ---------------------------------------------------------------------------
+-- AI
+-- ---------------------------------------------------------------------------
+create table ai_conversations (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references app_users(id) on delete cascade,
+  title text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (id, user_id)
+);
