@@ -363,3 +363,16 @@ create table ai_conversations (
   updated_at timestamptz not null default now(),
   unique (id, user_id)
 );
+
+create table ai_messages (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null,
+  conversation_id uuid not null,
+  role text not null check (role in ('user','assistant')),
+  content text not null,
+  meta jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  foreign key (conversation_id, user_id) references ai_conversations(id, user_id) on delete cascade
+);
+create index ai_messages_conv_idx on ai_messages(conversation_id, created_at);
+create index ai_messages_user_recent_idx on ai_messages(user_id, created_at desc) where role = 'user';
