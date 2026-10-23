@@ -272,3 +272,31 @@ export async function loadMonth(month?: string) {
   };
 }
 export type MonthData = Awaited<ReturnType<typeof loadMonth>>;
+
+/** Jobs with their pay calendar and weekly pattern, for the Jobs & pay editor. */
+export async function loadJobs() {
+  const ctx = await requireCtx();
+  const { listJobs, jobLabel } = await import("@/lib/server/services/jobs");
+  const jobs = await listJobs(ctx);
+  return {
+    today: ctx.today,
+    currency: ctx.currency,
+    taxPercent: ctx.prefs.reserve_percent,
+    jobs: jobs.map((j) => ({
+      id: j.id,
+      name: jobLabel(j),
+      employer: j.employer,
+      rateCents: j.current_rate_cents,
+      payFrequency: j.pay_frequency,
+      payDays: j.pay_days,
+      periodStartDays: j.period_start_days,
+      anchorDate: j.period_anchor_date,
+      offsetDays: j.payday_offset_days,
+      weekendRule: j.payday_weekend_rule,
+      splitDay: j.semimonthly_split_day,
+      schedule: j.regular_schedule,
+      confirmed: Boolean(j.pay_confirmed_at),
+    })),
+  };
+}
+export type JobsData = Awaited<ReturnType<typeof loadJobs>>;

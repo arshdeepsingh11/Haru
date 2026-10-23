@@ -12,6 +12,7 @@ import { RecordsSheet } from "./RecordsSheet";
 import { InboxSheet, SettingsSheet } from "./SettingsSheet";
 import { ScheduleSheet } from "./ScheduleSheet";
 import { ScanSheet } from "./ScanSheet";
+import { JobsSheet } from "./JobsSheet";
 import { CheckoutCard } from "./home/ShiftHome";
 import { CurrencyProvider, Sheet, ToastProvider } from "./ui";
 
@@ -20,7 +21,7 @@ const ASK_PREFILL: Record<string, string> = {
   paycheck: "My paycheck arrived: ",
 };
 
-type SheetName = "records" | "settings" | "inbox" | "schedule" | null;
+type SheetName = "records" | "settings" | "inbox" | "schedule" | "jobs" | null;
 
 export function AppShell({
   data,
@@ -49,6 +50,11 @@ export function AppShell({
   const checkout = initialCheckout ? (data.coach.checkouts.find((c) => c.id === initialCheckout) ?? null) : null;
   const [checkoutOpen, setCheckoutOpen] = useState(Boolean(checkout));
   const [recordsTab, setRecordsTab] = useState<string | null>(null);
+  const [jobFocus, setJobFocus] = useState<string | null>(null);
+  const openJobs = useCallback((jobId?: string) => {
+    setJobFocus(jobId ?? null);
+    setSheet("jobs");
+  }, []);
 
   const ask = useCallback((text: string) => {
     setPrefill(text);
@@ -119,7 +125,8 @@ export function AppShell({
       <RecordsSheet open={sheet === "records"} onClose={() => setSheet(null)} initialTab={recordsTab} />
       <SettingsSheet open={sheet === "settings"} onClose={() => setSheet(null)} vapidPublicKey={vapidPublicKey} />
       <InboxSheet open={sheet === "inbox"} onClose={() => setSheet(null)} />
-      <ScheduleSheet open={sheet === "schedule"} onClose={() => setSheet(null)} onScan={() => setScanOpen(true)} />
+      <ScheduleSheet open={sheet === "schedule"} onClose={() => setSheet(null)} onScan={() => setScanOpen(true)} onOpenJobs={() => openJobs()} />
+      <JobsSheet open={sheet === "jobs"} onClose={() => setSheet(null)} focusJobId={jobFocus} />
       <ScanSheet
         open={scanOpen}
         onClose={() => setScanOpen(false)}
@@ -175,7 +182,7 @@ export function AppShell({
                 </div>
               </header>
               <main className="mx-auto max-w-2xl px-4 pb-36 pt-3 lg:pb-16">
-                <Dashboard data={data} onAsk={ask} onOpenRecords={openRecords} onOpenSchedule={() => setSheet("schedule")} fresh={fresh} />
+                <Dashboard data={data} onAsk={ask} onOpenRecords={openRecords} onOpenSchedule={() => setSheet("schedule")} onOpenJobs={openJobs} fresh={fresh} />
               </main>
             </div>
 
