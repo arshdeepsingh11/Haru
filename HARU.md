@@ -11,7 +11,7 @@
 <br />
 <img alt="Gemini with fallback" src="https://img.shields.io/badge/AI-Gemini%20%2B%20fallback-ff6fb5?style=for-the-badge&logo=googlegemini&logoColor=white" />
 <img alt="Web Push" src="https://img.shields.io/badge/Web%20Push-VAPID-12142b?style=for-the-badge&logo=pwa&logoColor=white" />
-<img alt="Tests" src="https://img.shields.io/badge/tests-69%20passing-6e56ff?style=for-the-badge" />
+<img alt="Tests" src="https://img.shields.io/badge/tests-75%20passing-6e56ff?style=for-the-badge" />
 <img alt="PWA" src="https://img.shields.io/badge/phone--first-PWA-2bc8e8?style=for-the-badge" />
 
 <h3>Work for Haru.</h3>
@@ -62,7 +62,10 @@ goals + deadlines  →  how many jobs  →  each job's rate  →  how it pays
 
 Every answer is saved the moment you give it, and its card appears on the dashboard.
 
-### 2. Snap your schedule
+### 2. Your schedule as a calendar, or snap it
+
+Schedule is a month calendar. Each day shows a coloured bar per shift (one colour per job) and a coin on paydays. Tap a day to see what it earns, mark "I'm going", log different hours, delete a shift or add one, either once or every week. Shifts that cross midnight and two shifts on one day are both fine.
+
 
 Take a photo of a printed roster, a whiteboard or a screenshot from your work app. Haru reads every shift (date, start, end, break, which job), resolves *"Mon / Tue"* to real dates and flags anything it had to guess. **Nothing is saved until you review it.** Every row can be edited, unticked or deleted, and you can add shifts it missed.
 
@@ -105,10 +108,14 @@ days closer = shift take-home ÷ (monthly surplus ÷ 30.44)
 
 ### 6. An AI that acts, carefully
 
-- **47 typed tools.** Every argument is validated with Zod before anything touches the database.
+- **49 typed tools.** Every argument is validated with Zod before anything touches the database.
 - **Read, write and confirm levels.** Risky changes (time zone, currency) wait for your tap. Writes come with **Undo**.
 - **Haru never does arithmetic.** Every number comes from deterministic code. The model only decides which tool to call.
 - **Haru knows your situation.** Each turn it sees a live snapshot (next shift, paycheck so far, streak, payoff focus), so replies are short and specific.
+- **Haru remembers you.** Corrections ("it's the 15th and 30th, not the 3rd"), plans ("2,000 CAD home every month") and preferences are saved as short facts for that person only and shown to Haru on every turn. Nothing about any user is hardcoded.
+- **Haru checks its own work.** Every saved job comes back with the computed next payday ("Next payday Fri, Oct 30, for work Oct 16 to Oct 30"), so a wrong date is caught and fixed straight away. It can't save a pay calendar it hasn't been told: a twice-a-month job without pay days is refused, and Haru asks instead.
+- **Haru knows the date.** A calendar from last week to three weeks ahead, with paydays and bills marked, is in every turn, so "this Friday" and "next paycheck" are always right.
+- **You see it working.** Each step streams to the chat as it happens ("Saving your job ✓", "Adding Rent ✓"), and big messages are saved in one go.
 - **Busy servers don't stall you.** If Gemini is overloaded (503) or out of quota (429), Haru retries and then falls back through `gemini-3.8-flash → 3.6-flash → 3.5-flash-lite → 2.5-flash`, re-signing tool-call history so the switch is safe. If every model is busy, nothing is stored and you get a **Retry** button.
 
 ## Under the hood
