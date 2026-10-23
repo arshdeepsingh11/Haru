@@ -140,7 +140,7 @@ export async function createJob(ctx: Ctx, raw: JobCreate, actor: Actor): Promise
       values (${ctx.userId}, ${input.employer}, ${input.title ?? null}, ${ctx.currency}, ${input.status ?? "active"},
         ${input.start_date ?? null}, ${input.expected_weekly_hours != null ? Math.round(input.expected_weekly_hours * 60) : null},
         ${input.pay_frequency ?? null}, ${input.period_anchor_date ?? null}, ${input.semimonthly_split_day ?? 15},
-        ${input.period_start_days ? tx.array(input.period_start_days) : null}, ${input.pay_days ? tx.array(input.pay_days) : null},
+        ${input.period_start_days ? tx.array(input.period_start_days, 21) : null}, ${input.pay_days ? tx.array(input.pay_days, 21) : null},
         ${input.payday_offset_days ?? 0}, ${input.payday_weekend_rule ?? "none"}, ${input.deduction_percent ?? null},
         ${input.deduction_fixed != null ? toCents(input.deduction_fixed) : null}, ${tx.json((input.regular_schedule ?? []) as never)},
         ${input.notes ?? null}, ${confirmed ? new Date() : null})
@@ -195,8 +195,8 @@ export async function updateJob(ctx: Ctx, raw: JobUpdate, actor: Actor): Promise
     if (input.pay_frequency !== undefined) patch.pay_frequency = input.pay_frequency;
     if (input.period_anchor_date !== undefined) patch.period_anchor_date = input.period_anchor_date;
     if (input.semimonthly_split_day !== undefined) patch.semimonthly_split_day = input.semimonthly_split_day;
-    if ("period_start_days" in input) patch.period_start_days = input.period_start_days ? tx.array(input.period_start_days) : null;
-    if (input.pay_days !== undefined) patch.pay_days = tx.array(input.pay_days);
+    if ("period_start_days" in input) patch.period_start_days = input.period_start_days ? tx.array(input.period_start_days, 21) : null;
+    if (input.pay_days !== undefined) patch.pay_days = tx.array(input.pay_days, 21);
     if (input.payday_offset_days !== undefined) patch.payday_offset_days = input.payday_offset_days;
     if (input.payday_weekend_rule !== undefined) patch.payday_weekend_rule = input.payday_weekend_rule;
     if (input.deduction_percent !== undefined) patch.deduction_percent = input.deduction_percent;

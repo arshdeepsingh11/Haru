@@ -20,6 +20,8 @@ export function publicMessage(e: unknown): string {
   const msg = e instanceof Error ? e.message : String(e);
   if (/ECONNREFUSED|ENOTFOUND|connect_timeout|CONNECT_TIMEOUT|unconfigured/i.test(msg))
     return "HARU can't reach its database right now. Nothing was saved.";
+  if (/relation "[^"]+" does not exist|column "[^"]+" (of relation "[^"]+" )?does not exist/i.test(msg))
+    return "HARU's database needs an update. Run npm run db:migrate, then reload.";
   if (/duplicate key|unique constraint/i.test(msg)) return "That record already exists.";
   if (/violates check constraint/i.test(msg)) return "That value isn't allowed for this record.";
   if (/violates foreign key/i.test(msg)) return "That refers to a record that doesn't exist.";
