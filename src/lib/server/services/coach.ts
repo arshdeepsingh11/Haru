@@ -69,7 +69,8 @@ export async function projectedMonthlyTakeHome(ctx: Ctx): Promise<number> {
   return takeHome(ctx, Math.round((weeklyGross * 52) / 12));
 }
 
-export async function getPayoffPlan(ctx: Ctx): Promise<PayoffPlan> {
+/** The inputs of the payoff plan, so the client can re-run it for "what if" questions (send-home planner). */
+export async function payoffInputs(ctx: Ctx): Promise<Parameters<typeof buildPayoffPlan>[0]> {
   const [income, bills, debts, goals] = await Promise.all([
     projectedMonthlyTakeHome(ctx),
     listBills(ctx),
@@ -79,13 +80,17 @@ export async function getPayoffPlan(ctx: Ctx): Promise<PayoffPlan> {
     sql<{ id: string; name: string; target_cents: number; saved_cents: number; target_date: string | null }[]>`
       select goal_id as id, name, target_cents, saved_cents, target_date from goal_progress where user_id = ${ctx.userId} and status = 'active'`,
   ]);
-  return buildPayoffPlan({
+  return {
     today: ctx.today,
     monthlyTakeHomeCents: income,
     monthlyBillsCents: bills.reduce((a, b) => a + monthlyEquivalent(b.amount_cents, b.recurrence), 0),
     debts: debts.map((d) => ({ id: d.id, name: d.name, balanceCents: d.balance_cents, aprPercent: d.interest_rate_percent, minimumCents: d.minimum_payment_cents })),
     goals: goals.map((g) => ({ id: g.id, name: g.name, targetCents: g.target_cents, savedCents: g.saved_cents, targetDate: g.target_date })),
-  });
+  };
+}
+
+export async function getPayoffPlan(ctx: Ctx): Promise<PayoffPlan> {
+  return buildPayoffPlan(await payoffInputs(ctx));
 }
 
 export async function attendanceStats(ctx: Ctx): Promise<Stats> {

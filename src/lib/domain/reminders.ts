@@ -1,7 +1,7 @@
 import { formatMoney } from "./money";
 import { addDays, type ISODate, localDate, localTime, todayIn, zonedToUtc } from "./time";
 
-export type ReminderCategory = "shift" | "checkout" | "log_hours" | "payday" | "bill" | "goal" | "opportunity" | "custom";
+export type ReminderCategory = "shift" | "checkout" | "log_hours" | "payday" | "bill" | "goal" | "opportunity" | "custom" | "market";
 
 export interface ReminderPayload {
   shiftId?: string;

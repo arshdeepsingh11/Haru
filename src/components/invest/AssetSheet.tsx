@@ -9,6 +9,7 @@ import { Sheet, useToast } from "../ui";
 import { PriceChart } from "./PriceChart";
 import { fmtChange, fmtPct, fmtPrice, freshnessLabel } from "./format";
 import { InsightCard, NewsList } from "./parts";
+import { AssetAlerts } from "./Alerts";
 
 type Q = { price: number; change: number | null; changePct: number | null; asOf: string; source: string; freshness: string; stale: boolean; currency: string; unit?: string };
 
@@ -169,6 +170,8 @@ export function AssetSheet({ assetKey, title, onClose, onAsk }: { assetKey: stri
               <MessageSquareText size={16} /> Ask Haru
             </button>
           </div>
+
+          <AssetAlerts assetKey={data.asset.key} currency={cur} price={q?.price ?? null} />
 
           {data.news.length > 0 && (
             <section className="grid gap-2">

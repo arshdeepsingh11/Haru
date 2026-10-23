@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { runScheduler } from "@/lib/server/notifications/scheduler";
 import { logError } from "@/lib/server/errors";
 import { refreshNewsIfStale } from "@/lib/server/invest/news";
+import { checkAlerts } from "@/lib/server/invest/planning";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,7 +26,9 @@ async function handle(req: Request) {
     const result = await runScheduler();
     // Headlines for the Invest tab refresh every 15 minutes on the same heartbeat.
     await refreshNewsIfStale(8000).catch((e) => logError("cron.news", e));
-    return NextResponse.json({ ok: true, ...result });
+    // Price alerts (every 5 minutes); anything that fired is delivered on the next run.
+    const alerts = await checkAlerts({ deadlineMs: 15_000 }).catch((e) => (logError("cron.alerts", e), null));
+    return NextResponse.json({ ok: true, ...result, alerts });
   } catch (e) {
     logError("cron", e);
     return NextResponse.json({ ok: false, error: "Scheduler run failed" }, { status: 500 });
