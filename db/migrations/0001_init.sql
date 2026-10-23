@@ -148,3 +148,28 @@ create index shifts_user_date_idx on shifts(user_id, work_date);
 create index shifts_job_date_idx on shifts(job_id, work_date);
 -- Shifts generated from a job's regular schedule are materialised idempotently.
 create unique index shifts_schedule_once on shifts(job_id, work_date, starts_at) where source = 'schedule';
+
+create table work_opportunities (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references app_users(id) on delete cascade,
+  name text not null check (length(name) between 1 and 120),
+  offered_cents bigint not null check (offered_cents >= 0),
+  pay_basis text not null default 'unknown' check (pay_basis in ('gross','net','unknown')),
+  expected_minutes integer check (expected_minutes > 0 and expected_minutes <= 1440),
+  work_date date,
+  starts_at timestamptz,
+  ends_at timestamptz,
+  status text not null default 'considering'
+    check (status in ('considering','accepted','scheduled','completed','declined')),
+  actual_minutes integer check (actual_minutes > 0 and actual_minutes <= 1440),
+  earned_cents bigint check (earned_cents >= 0),
+  decided_at timestamptz,
+  completed_at timestamptz,
+  notes text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (id, user_id),
+  check (status <> 'completed' or earned_cents is not null),
+  check (status <> 'scheduled' or work_date is not null)
+);
+create index opp_user_idx on work_opportunities(user_id, status);
