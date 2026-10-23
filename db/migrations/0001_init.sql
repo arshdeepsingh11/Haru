@@ -395,3 +395,20 @@ create table ai_actions (
   foreign key (conversation_id, user_id) references ai_conversations(id, user_id) on delete cascade
 );
 create index ai_actions_conv_idx on ai_actions(conversation_id, created_at);
+
+-- ---------------------------------------------------------------------------
+-- Personalisation, dashboard, audit
+-- ---------------------------------------------------------------------------
+create table behavior_observations (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references app_users(id) on delete cascade,
+  kind text not null,
+  statement text not null,
+  basis text not null,                  -- the evidence, in words
+  evidence jsonb not null default '{}'::jsonb,
+  confidence text not null check (confidence in ('observed','hypothesis')),
+  status text not null default 'active' check (status in ('active','dismissed','accepted')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, kind)
+);
