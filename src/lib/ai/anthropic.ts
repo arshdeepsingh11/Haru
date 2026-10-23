@@ -36,6 +36,10 @@ export class AnthropicProvider implements ChatProvider {
       );
     }
 
+    return this.toResponse(res);
+  }
+
+  private toResponse(res: Anthropic.Message): ChatResponse {
     const content: Block[] = [];
     for (const b of res.content) {
       if (b.type === "text") content.push({ type: "text", text: b.text });
@@ -43,5 +47,28 @@ export class AnthropicProvider implements ChatProvider {
     }
     const stopReason = res.stop_reason === "tool_use" ? "tool_use" : res.stop_reason === "end_turn" ? "end" : res.stop_reason === "max_tokens" ? "max_tokens" : "other";
     return { content, stopReason };
+  }
+
+  async vision(req: { system: string; prompt: string; image: { mime: string; base64: string } }): Promise<string> {
+    try {
+      const res = await this.client.messages.create({
+        model: this.model,
+        max_tokens: 4096,
+        system: req.system,
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "image", source: { type: "base64", media_type: req.image.mime as "image/jpeg", data: req.image.base64 } },
+              { type: "text", text: `${req.prompt}\nReply with the JSON only.` },
+            ],
+          },
+        ],
+      });
+      return res.content.map((b) => (b.type === "text" ? b.text : "")).join("");
+    } catch (e) {
+      const status = (e as { status?: number }).status;
+      throw new ProviderUnavailable(status === 401 ? "The AI provider rejected HARU's API key." : "The AI service couldn't read the photo right now.");
+    }
   }
 }

@@ -1,12 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Check, ChevronLeft, ChevronRight, Loader2, Plus, Repeat, Sparkles, Trash2, X } from "lucide-react";
+import { Camera, Check, ChevronLeft, ChevronRight, Loader2, Plus, Repeat, Sparkles, Trash2, X } from "lucide-react";
 import { loadSchedule, type ScheduleData } from "@/app/actions";
 import { Sheet, hours, useAct, useMoney } from "./ui";
 import { timeRange } from "./home/ShiftHome";
 
-const DOT = ["bg-violet", "bg-fuchsia-400", "bg-indigo-400", "bg-purple-300", "bg-pink-400"];
+const DOT = ["bg-iris", "bg-lagoon", "bg-bloom", "bg-amber", "bg-ink"];
 const WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 function addDays(d: string, n: number) {
@@ -20,7 +20,7 @@ function dayTitle(d: string, today: string) {
   return new Date(`${d}T12:00:00Z`).toLocaleDateString("en-CA", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" });
 }
 
-export function ScheduleSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function ScheduleSheet({ open, onClose, onScan }: { open: boolean; onClose: () => void; onScan: () => void }) {
   const [week, setWeek] = useState<string | undefined>(undefined);
   const [data, setData] = useState<ScheduleData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -47,13 +47,13 @@ export function ScheduleSheet({ open, onClose }: { open: boolean; onClose: () =>
           <Loader2 size={15} className="animate-spin" /> Loading your week…
         </p>
       ) : (
-        <Week data={data} onWeek={setWeek} mode={mode} setMode={setMode} reload={() => refresh(week)} />
+        <Week data={data} onWeek={setWeek} mode={mode} setMode={setMode} reload={() => refresh(week)} onScan={onScan} />
       )}
     </Sheet>
   );
 }
 
-function Week({ data, onWeek, mode, setMode, reload }: { data: ScheduleData; onWeek: (w: string) => void; mode: null | "shift" | "extra"; setMode: (m: null | "shift" | "extra") => void; reload: () => void }) {
+function Week({ data, onWeek, mode, setMode, reload, onScan }: { data: ScheduleData; onWeek: (w: string) => void; mode: null | "shift" | "extra"; setMode: (m: null | "shift" | "extra") => void; reload: () => void; onScan: () => void }) {
   const money = useMoney();
   const { run, pending } = useAct();
   const days = Array.from({ length: 7 }, (_, i) => addDays(data.start, i));
@@ -82,15 +82,24 @@ function Week({ data, onWeek, mode, setMode, reload }: { data: ScheduleData; onW
         </p>
       </div>
 
+      <button className="glass flex items-center gap-3 p-3.5 text-left" onClick={onScan}>
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl text-white" style={{ background: "var(--aurora)" }}>
+          <Camera size={20} />
+        </span>
+        <span>
+          <span className="block font-semibold">Scan a photo of your schedule</span>
+          <span className="block text-sm text-ink-2">Haru reads the shifts, you check and edit them</span>
+        </span>
+      </button>
       {data.jobs.length === 0 ? (
-        <p className="glass p-5 text-sm text-ink-2">Add a job first (Records, or tell HARU) and your shifts will appear here.</p>
+        <p className="text-sm text-ink-2">Or tell Haru about your job first, and add shifts by hand here.</p>
       ) : (
-        <div className="flex flex-wrap gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:flex">
           <button className="btn btn-primary" onClick={() => setMode(mode === "shift" ? null : "shift")}>
             <Plus size={16} /> Add shift
           </button>
           <button className="btn btn-line" onClick={() => setMode(mode === "extra" ? null : "extra")}>
-            <Sparkles size={15} /> Extra one-time shift
+            <Sparkles size={15} /> Extra shift
           </button>
         </div>
       )}
@@ -98,14 +107,14 @@ function Week({ data, onWeek, mode, setMode, reload }: { data: ScheduleData; onW
       {mode === "shift" && <AddShift data={data} onDone={() => { setMode(null); reload(); }} />}
       {mode === "extra" && <AddExtra data={data} onDone={() => { setMode(null); reload(); }} />}
 
-      <ol className="grid gap-3">
+      <ol className="grid gap-2">
         {days.map((d) => {
           const list = data.shifts.filter((s) => s.date === d);
           const extras = data.extras.filter((x) => x.date === d);
           return (
-            <li key={d} className={`glass p-4 ${d === data.today ? "ring-2 ring-violet/30" : ""}`}>
+            <li key={d} className={`${list.length || extras.length ? "glass p-4" : "flex items-baseline justify-between rounded-2xl border border-dashed border-line px-4 py-3"} ${d === data.today ? "ring-2 ring-iris/30" : ""}`}>
               <p className="text-sm font-semibold">{dayTitle(d, data.today)}</p>
-              {list.length === 0 && extras.length === 0 && <p className="mt-1 text-sm text-ink-3">Day off</p>}
+              {list.length === 0 && extras.length === 0 && <p className="text-sm text-ink-3">Day off</p>}
               <ul className="mt-2 grid gap-2">
                 {list.map((s) => (
                   <li key={s.id} className="flex flex-wrap items-center gap-3 rounded-2xl bg-white/60 px-3 py-2.5">
@@ -117,7 +126,7 @@ function Week({ data, onWeek, mode, setMode, reload }: { data: ScheduleData; onW
                         {s.start ? `, ${hours(s.minutes)}` : ""}
                       </p>
                     </div>
-                    <span className={`figure font-bold ${s.status === "completed" ? "text-ink" : s.status === "missed" ? "text-ink-3" : "text-violet"}`}>
+                    <span className={`figure text-sm ${s.status === "completed" ? "text-ink" : s.status === "missed" ? "text-ink-3" : "text-violet"}`}>
                       {s.status === "missed" ? "missed" : `+${money(s.takeHomeCents)}`}
                     </span>
                     {s.status === "completed" && <span className="chip chip-moss"><Check size={12} /> done</span>}
