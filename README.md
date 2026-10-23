@@ -27,7 +27,7 @@ Every financial number is computed by deterministic code from stored records. Th
 | AI provider abstraction, tools, agent loop | `src/lib/ai/*` |
 | Push delivery + durable scheduler | `src/lib/server/notifications/*`, `public/sw.js` |
 | UI: dashboard, invest, command center, records, settings, onboarding | `src/components/*`, `src/app/*` |
-| Tests: unit (58), integration (36) | `tests/` |
+| Tests: unit (62), integration (36), against the real postgres.js driver | `tests/` |
 
 **Stack:** Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · Supabase (Postgres + Auth) · postgres.js with plain SQL migrations · Zod 4 · Anthropic Claude (behind `src/lib/ai/provider.ts`) · Recharts · web-push.
 
@@ -63,7 +63,7 @@ The migration enables row-level security with **no policies** on every table and
 
 ### 3. AI
 
-Free option: create a key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey) and set `GEMINI_API_KEY` (Gemini is preferred when set; override the model with `HARU_AI_MODEL`). Or create a key at [console.anthropic.com](https://console.anthropic.com) and set `ANTHROPIC_API_KEY` (with `HARU_AI_PROVIDER=anthropic` if both are set). Optionally set `HARU_AI_MODEL` (default `claude-sonnet-5-5`). Without a key, everything except the chat works, and the chat says plainly that the AI isn't configured.
+Recommended: create a key at [console.anthropic.com](https://console.anthropic.com) and set `ANTHROPIC_API_KEY`. Claude answers first (default `claude-opus-5-5`, or set `HARU_CLAUDE_MODEL=claude-sonnet-5-5` to spend less). Also set the free `GEMINI_API_KEY` from [aistudio.google.com/apikey](https://aistudio.google.com/apikey) and Haru switches to Gemini automatically when Claude is busy. Either key alone works. Without a key, everything except the chat works, and the chat says plainly that the AI isn't configured.
 
 To use another vendor later, add an adapter implementing `ChatProvider` in `src/lib/ai/` and return it from `getProvider()`.
 
@@ -132,10 +132,11 @@ Reminder categories and timing (minutes before shifts, the time to nudge you to 
 | `DATABASE_URL_MIGRATIONS` | for migrations | Session pooler / direct (5432). Falls back to `DATABASE_URL`. |
 | `NEXT_PUBLIC_SUPABASE_URL` | yes | Public. |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | yes | Public by design; it cannot read HARU's tables (see RLS above). |
-| `GEMINI_API_KEY` | for the AI (free) | Server only. Preferred when set. |
+| `ANTHROPIC_API_KEY` | for the AI (recommended) | Claude answers first when set. Server only. |
+| `HARU_CLAUDE_MODEL` | no | Default `claude-opus-5-5`; `claude-sonnet-5-5` is cheaper. |
+| `GEMINI_API_KEY` | for the AI (free) | Used alone, or as the automatic backup when Claude is busy. Server only. |
+| `HARU_GEMINI_MODEL` | no | Default `gemini-3.8-flash`. |
 | `HARU_AI_FALLBACK_MODELS` | optional | Comma-separated Gemini models tried when the main one is busy. Default: `gemini-3.6-flash,gemini-2.5-flash` (flash-lite is left out: it drops details). Empty string disables fallback. |
-| `ANTHROPIC_API_KEY` | for the AI | Server only. |
-| `HARU_AI_MODEL` | no | Default `claude-sonnet-5-5`. |
 | `TWELVE_DATA_API_KEY` | for Invest (free) | US stocks/ETFs, FX, crypto, gold/silver, live. Server only. |
 | `ALPHA_VANTAGE_API_KEY` | for Invest (free) | BSE (India) and TSX (Canada) end-of-day history. Server only. |
 | `EODHD_API_KEY` | optional (paid) | Delayed NSE/TSX quotes and Nifty/Sensex/TSX indexes. Server only. |

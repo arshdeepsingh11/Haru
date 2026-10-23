@@ -11,7 +11,7 @@
 <br />
 <img alt="Gemini with fallback" src="https://img.shields.io/badge/AI-Gemini%20%2B%20fallback-494d4f?style=for-the-badge&logo=googlegemini&logoColor=white" />
 <img alt="Web Push" src="https://img.shields.io/badge/Web%20Push-VAPID-26292b?style=for-the-badge&logo=pwa&logoColor=white" />
-<img alt="Tests" src="https://img.shields.io/badge/tests-94%20passing-8a6a2f?style=for-the-badge" />
+<img alt="Tests" src="https://img.shields.io/badge/tests-98%20passing-8a6a2f?style=for-the-badge" />
 <img alt="PWA" src="https://img.shields.io/badge/phone--first-PWA-c9a464?style=for-the-badge" />
 
 <h3>Work for Haru.</h3>
@@ -116,6 +116,7 @@ days closer = shift take-home ÷ (monthly surplus ÷ 30.44)
 - **Haru checks its own work.** Every saved job comes back with the computed next payday ("Next payday Fri, Oct 30, for work Oct 16 to Oct 30"), so a wrong date is caught and fixed straight away. It can't save a pay calendar it hasn't been told: a twice-a-month job without pay days is refused, and Haru asks instead.
 - **Haru knows the date.** A calendar from last week to three weeks ahead, with paydays and bills marked, is in every turn, so "this Friday" and "next paycheck" are always right.
 - **You see it working.** Each step streams to the chat as it happens ("Saving your job ✓", "Adding Rent ✓"), and big messages are saved in one go.
+- **Claude first, Gemini as backup.** With an Anthropic key, Claude answers; if Claude is down or busy, the same turn continues on Gemini.
 - **Busy servers don't stall you.** If Gemini is overloaded (503) or out of quota (429), Haru retries and then falls back through `gemini-3.8-flash → 3.6-flash → 2.5-flash`, re-signing tool-call history so the switch is safe. If every model is busy, nothing is stored and you get a **Retry** button.
 
 ### 7. Invest: one tab for India, Canada and the world
@@ -171,7 +172,7 @@ flowchart LR
 
 ```bash
 npm install
-cp .env.example .env.local        # Supabase, DATABASE_URL, GEMINI_API_KEY, VAPID, market data keys
+cp .env.example .env.local        # Supabase, DATABASE_URL, ANTHROPIC_API_KEY (+ GEMINI_API_KEY backup), VAPID, market data keys
 npm run db:migrate                # 0001 … 0006 (invest)
 npm run dev
 ```
