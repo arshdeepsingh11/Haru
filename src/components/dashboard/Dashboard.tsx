@@ -7,6 +7,7 @@ import type { ComponentKey } from "@/lib/dashboard-registry";
 import { cancelReminderAction, observationAction, resetDashboardLayout } from "@/app/actions";
 import { MoneyBar } from "./MoneyBar";
 import { EarningsChart, SpendingChart } from "./Charts";
+import { CheckoutCards, NextShiftHero, PaycheckCards, PayoffPlanCard, StatTiles, WeekStrip } from "../home/ShiftHome";
 import { dayLabel, dayLabelInline, Empty, hours, Progress, useAct, useMoney, useToast } from "../ui";
 import { useRouter } from "next/navigation";
 
@@ -14,11 +15,15 @@ export interface DashboardProps {
   data: DashboardData;
   onAsk: (text: string) => void;
   onOpenRecords: (tab?: string) => void;
+  onOpenSchedule: () => void;
 }
+
+// These live in the shift-first block at the top, so the ordered list skips them.
+const SHOWN_ABOVE = new Set<ComponentKey>(["paydays", "upcoming_work", "goals", "debts"]);
 
 function Section({ id, title, aside, children }: { id: string; title: string; aside?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section aria-labelledby={`${id}-h`} className="border-t border-line pt-5">
+    <section aria-labelledby={`${id}-h`} className="glass p-5 sm:p-6">
       <div className="mb-3 flex items-baseline justify-between gap-3">
         <h2 id={`${id}-h`} className="section-title">
           {title}
@@ -30,7 +35,7 @@ function Section({ id, title, aside, children }: { id: string; title: string; as
   );
 }
 
-export function Dashboard({ data, onAsk, onOpenRecords }: DashboardProps) {
+export function Dashboard({ data, onAsk, onOpenRecords, onOpenSchedule }: DashboardProps) {
   const money = useMoney();
   const { run, pending } = useAct();
   const toast = useToast();
@@ -45,38 +50,35 @@ export function Dashboard({ data, onAsk, onOpenRecords }: DashboardProps) {
     position: () => <MoneyBar p={data.position} today={t} onSetBalance={() => onOpenRecords("money")} />,
 
     earnings: () => (
-      <Section id="earn" title="Earnings" aside={<span className="text-xs text-ink-3">Gross, from logged work</span>}>
-        <div className="grid grid-cols-2 gap-4">
+      <section aria-labelledby="earn-h" className="glass p-5 sm:p-6">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 id="earn-h" className="section-title">
+            What you took home
+          </h2>
+          <span className="text-xs text-ink-3">after {data.reservePercent}% tax, from logged shifts</span>
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-4">
           <div>
             <p className="text-xs text-ink-2">This week</p>
-            <p className="figure text-2xl font-[650]">{money(data.earnings.weekCents)}</p>
-            <p className="text-xs text-ink-3">{hours(data.earnings.weekMinutes)}</p>
+            <p className="figure text-3xl font-bold text-violet">{money(Math.round(data.earnings.weekCents * (1 - data.reservePercent / 100)))}</p>
+            <p className="text-xs text-ink-3">{hours(data.earnings.weekMinutes)} worked</p>
           </div>
           <div>
             <p className="text-xs text-ink-2">This month</p>
-            <p className="figure text-2xl font-[650]">{money(data.earnings.monthCents)}</p>
-            <p className="text-xs text-ink-3">{hours(data.earnings.monthMinutes)}</p>
+            <p className="figure text-3xl font-bold">{money(Math.round(data.earnings.monthCents * (1 - data.reservePercent / 100)))}</p>
+            <p className="text-xs text-ink-3">{hours(data.earnings.monthMinutes)} worked</p>
           </div>
         </div>
         {data.earnings.weekly.some((w) => w.total > 0) ? (
           <div className="mt-4">
-            <EarningsChart weekly={data.earnings.weekly} jobNames={data.earnings.jobNames} />
-            {data.earnings.byJobMonth.length > 1 && (
-              <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm">
-                {data.earnings.byJobMonth.map((j) => (
-                  <li key={j.name}>
-                    <span className="text-ink-2">{j.name}</span> <span className="figure font-semibold">{money(j.cents)}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <EarningsChart weekly={data.earnings.weekly} taxPercent={data.reservePercent} />
           </div>
         ) : (
           <div className="mt-3">
-            <Empty>No hours logged in the last 8 weeks. Tell HARU when you finish a shift — “I worked 6 hours at the hotel today.”</Empty>
+            <Empty>Your chart fills in as you check out of shifts.</Empty>
           </div>
         )}
-      </Section>
+      </section>
     ),
 
     paydays: () => (
@@ -313,10 +315,11 @@ export function Dashboard({ data, onAsk, onOpenRecords }: DashboardProps) {
   const hour = Number(new Date().toLocaleString("en-US", { timeZone: data.tz, hour: "numeric", hourCycle: "h23" }));
   const greeting = hour < 5 ? "Good night" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
+  const c = data.coach;
   return (
-    <div className="grid gap-6">
+    <div className="grid gap-5">
       <div>
-        <h1 className="text-2xl font-[650] tracking-tight sm:text-[1.75rem]">
+        <h1 className="text-[1.7rem] font-bold tracking-tight sm:text-3xl">
           {greeting}
           {data.displayName ? `, ${data.displayName}` : ""}
         </h1>
@@ -325,9 +328,22 @@ export function Dashboard({ data, onAsk, onOpenRecords }: DashboardProps) {
 
       {data.isEmpty && <FirstSteps onAsk={onAsk} onOpenRecords={onOpenRecords} />}
 
-      {data.order.map((k) => (
-        <div key={k}>{render[k]()}</div>
-      ))}
+      {!data.isEmpty && (
+        <>
+          <CheckoutCards items={c.checkouts} today={t} taxPercent={c.taxPercent} />
+          <NextShiftHero c={c} today={t} onOpenSchedule={onOpenSchedule} />
+          <StatTiles c={c} />
+          <PaycheckCards paydays={data.paydays} taxPercent={c.taxPercent} today={t} onOpenRecords={onOpenRecords} />
+          <PayoffPlanCard c={c} onAsk={onAsk} />
+          <WeekStrip c={c} today={t} onOpenSchedule={onOpenSchedule} />
+        </>
+      )}
+
+      {data.order
+        .filter((k) => !SHOWN_ABOVE.has(k))
+        .map((k) => (
+          <div key={k}>{render[k]()}</div>
+        ))}
 
       {custom && (
         <p className="text-xs text-ink-3">
