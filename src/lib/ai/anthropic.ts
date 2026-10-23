@@ -7,7 +7,11 @@ export class AnthropicProvider implements ChatProvider {
   private client: Anthropic;
 
   constructor(apiKey: string, private model: string) {
-    this.client = new Anthropic({ apiKey, maxRetries: 2, timeout: 45_000 });
+    this.client = new Anthropic({ apiKey, maxRetries: 2, timeout: 60_000 });
+  }
+
+  get modelInUse() {
+    return this.model;
   }
 
   async chat(req: { system: string; messages: ChatMessage[]; tools: ToolSpec[]; maxTokens?: number }): Promise<ChatResponse> {
@@ -24,16 +28,24 @@ export class AnthropicProvider implements ChatProvider {
     try {
       res = await this.client.messages.create({
         model: this.model,
-        max_tokens: req.maxTokens ?? 1500,
-        system: [{ type: "text", text: req.system }],
-        ...(req.tools.length ? { tools: req.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.inputSchema as Anthropic.Tool.InputSchema })) } : {}),
+        max_tokens: req.maxTokens ?? 4096,
+        // The system prompt and ~50 tool definitions are the same every turn: cache them
+        // (faster first token, much cheaper input). The cache breakpoint on the last tool covers all tools.
+        system: [{ type: "text", text: req.system, cache_control: { type: "ephemeral" } }],
+        ...(req.tools.length
+          ? {
+              tools: req.tools.map((t, i) => ({
+                name: t.name,
+                description: t.description,
+                input_schema: t.inputSchema as Anthropic.Tool.InputSchema,
+                ...(i === req.tools.length - 1 ? { cache_control: { type: "ephemeral" as const } } : {}),
+              })),
+            }
+          : {}),
         messages,
       });
     } catch (e) {
-      const status = (e as { status?: number }).status;
-      throw new ProviderUnavailable(
-        status === 401 ? "The AI provider rejected HARU's API key." : status === 429 ? "The AI provider is rate-limiting requests. Try again in a moment." : "The AI service is unavailable right now.",
-      );
+      throw new ProviderUnavailable(failure(e, this.model));
     }
 
     return this.toResponse(res);
@@ -68,7 +80,19 @@ export class AnthropicProvider implements ChatProvider {
       return res.content.map((b) => (b.type === "text" ? b.text : "")).join("");
     } catch (e) {
       const status = (e as { status?: number }).status;
-      throw new ProviderUnavailable(status === 401 ? "The AI provider rejected HARU's API key." : "The AI service couldn't read the photo right now.");
+      throw new ProviderUnavailable(status === 401 ? "The AI provider rejected HARU's API key." : failure(e, this.model));
     }
   }
+}
+
+function failure(e: unknown, model: string): string {
+  const status = (e as { status?: number }).status;
+  const detail = ((e as { message?: string }).message ?? "").slice(0, 300);
+  console.error(`[haru:claude] ${model} failed (${status ?? "network"}): ${detail}`);
+  if (status === 401 || status === 403) return "The AI provider rejected HARU's API key.";
+  if (status === 404) return `Claude doesn't recognise the model "${model}". Check HARU_CLAUDE_MODEL.`;
+  if (status === 429) return "Claude is rate-limiting requests. Try again in a moment.";
+  if (status === 529 || status === 503) return "Claude is busy right now. Try again in a moment.";
+  if (status === 400 && /credit|billing/i.test(detail)) return "Your Anthropic account is out of credit. Add credit at console.anthropic.com.";
+  return "The AI service is unavailable right now.";
 }

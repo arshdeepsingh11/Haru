@@ -108,6 +108,8 @@ export interface GeminiOptions {
   callTimeoutMs?: number;
   /** Total time one request may spend across retries and fallbacks. */
   budgetMs?: number;
+  /** History may come from another provider (Claude), so tool calls carry no Gemini signatures. */
+  foreignHistory?: boolean;
 }
 
 export class GeminiProvider implements ChatProvider {
@@ -117,6 +119,7 @@ export class GeminiProvider implements ChatProvider {
   private delays: number[];
   private callTimeoutMs: number;
   private budgetMs: number;
+  private foreignHistory: boolean;
 
   constructor(
     private apiKey: string,
@@ -129,6 +132,7 @@ export class GeminiProvider implements ChatProvider {
     this.delays = opts.retryDelaysMs ?? [600];
     this.callTimeoutMs = opts.callTimeoutMs ?? 20_000;
     this.budgetMs = opts.budgetMs ?? 40_000;
+    this.foreignHistory = opts.foreignHistory ?? false;
   }
 
   /** The model that answered last (sticky for the rest of this turn). */
@@ -221,7 +225,7 @@ export class GeminiProvider implements ChatProvider {
     const contents = toGeminiContents(req.messages);
     const json = await this.generate((model, switched, thinking) => ({
       systemInstruction: { parts: [{ text: req.system }] },
-      contents: switched ? resignContents(contents) : contents,
+      contents: switched || this.foreignHistory ? resignContents(contents) : contents,
       ...(req.tools.length
         ? { tools: [{ functionDeclarations: req.tools.map((t) => ({ name: t.name, description: t.description, parametersJsonSchema: t.inputSchema })) }], toolConfig: { functionCallingConfig: { mode: "AUTO" } } }
         : {}),
