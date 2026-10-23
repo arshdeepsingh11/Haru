@@ -376,3 +376,22 @@ create table ai_messages (
 );
 create index ai_messages_conv_idx on ai_messages(conversation_id, created_at);
 create index ai_messages_user_recent_idx on ai_messages(user_id, created_at desc) where role = 'user';
+
+create table ai_actions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null,
+  conversation_id uuid not null,
+  message_id uuid references ai_messages(id) on delete set null,
+  tool text not null,
+  args jsonb not null,
+  risk text not null check (risk in ('read','write','confirm')),
+  status text not null check (status in ('pending_confirmation','completed','failed','cancelled','undone')),
+  summary text,
+  result jsonb,
+  undo jsonb,
+  error text,
+  created_at timestamptz not null default now(),
+  resolved_at timestamptz,
+  foreign key (conversation_id, user_id) references ai_conversations(id, user_id) on delete cascade
+);
+create index ai_actions_conv_idx on ai_actions(conversation_id, created_at);
