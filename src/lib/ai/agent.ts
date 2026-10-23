@@ -10,7 +10,9 @@ import { riskOf, TOOL_MAP, toolSpecs, type ToolOutput } from "./tools";
 import { autoPlace } from "../server/services/cards";
 import type { CardKey } from "../dashboard-registry";
 
-const MAX_STEPS = 8;
+const MAX_STEPS = 6;
+/** Stay well inside the 60 s server limit: after this, wrap up with what's already done. */
+const TURN_BUDGET_MS = 42_000;
 const HISTORY = 16;
 
 export interface ActionView {
@@ -119,10 +121,30 @@ export interface TurnResult {
   cardsAdded: CardKey[];
   /** The model could not be reached; nothing was stored, so the client can simply retry. */
   retryable?: boolean;
+  /** Which model answered (e.g. gemini-3.8-flash). */
+  model?: string;
+}
+
+function modelName(p: ChatProvider | null): string | undefined {
+  return p ? ((p as { modelInUse?: string }).modelInUse ?? p.name) : undefined;
 }
 
 /** One user turn: model ↔ tools loop over HARU's authorised services. */
-export async function runTurn(ctx: Ctx, input: { conversationId?: string | null; text: string }, opts: { provider?: ChatProvider } = {}): Promise<TurnResult> {
+/** Live progress for the chat while a turn runs. */
+export type TurnEvent = { type: "thinking"; step: number } | { type: "tool"; id: string; tool: string; status: "running" | "done" | "failed"; summary?: string };
+
+export async function runTurn(
+  ctx: Ctx,
+  input: { conversationId?: string | null; text: string },
+  opts: { provider?: ChatProvider; onEvent?: (e: TurnEvent) => void } = {},
+): Promise<TurnResult> {
+  const emit = (e: TurnEvent) => {
+    try {
+      opts.onEvent?.(e);
+    } catch {
+      /* the client went away; keep working */
+    }
+  };
   const text = input.text.trim().slice(0, 4000);
   if (!text) throw new AppError("Say something for HARU to work on.");
   await checkRateLimit(ctx);
@@ -149,15 +171,23 @@ export async function runTurn(ctx: Ctx, input: { conversationId?: string | null;
 
   const actionIds: string[] = [];
   const cardsAdded: CardKey[] = [];
+  let usedProvider: ChatProvider | null = null;
   let changed = false;
   let finalText = "";
   let failed = false;
 
   try {
+    const startedAt = Date.now();
     const provider = opts.provider ?? (await getProvider());
+    usedProvider = provider;
     const system = await buildSystemPrompt(ctx);
     const tools = toolSpecs();
     for (let step = 0; step < MAX_STEPS; step++) {
+      if (step > 0 && Date.now() - startedAt > TURN_BUDGET_MS) {
+        finalText = "Saved what you told me so far. What's next?";
+        break;
+      }
+      emit({ type: "thinking", step });
       const res = await provider.chat({ system, messages, tools });
       messages.push({ role: "assistant", content: res.content });
       const calls = res.content.filter((b): b is Extract<Block, { type: "tool_call" }> => b.type === "tool_call");
@@ -188,7 +218,9 @@ export async function runTurn(ctx: Ctx, input: { conversationId?: string | null;
             results.push({ type: "tool_result", id: call.id, content: JSON.stringify({ status: "needs_confirmation", will_do: preview, note: "Not done yet. The user must press Confirm." }) });
             continue;
           }
+          emit({ type: "tool", id: call.id, tool: t.name, status: "running" });
           const out = await t.run(ctx, parsed.data);
+          emit({ type: "tool", id: call.id, tool: t.name, status: "done", summary: out.summary });
           for (const k of out.cardsAdded ?? []) if (!cardsAdded.includes(k)) cardsAdded.push(k);
           if (risk === "write") {
             changed = true;
@@ -202,6 +234,7 @@ export async function runTurn(ctx: Ctx, input: { conversationId?: string | null;
           const msg = publicMessage(e);
           if (!(e instanceof AppError)) logError(`tool.${t.name}`, e);
           if (risk !== "read") actionIds.push(await saveAction(ctx, conversationId, { tool: t.name, args: parsed.data, risk, status: "failed", error: msg }));
+          emit({ type: "tool", id: call.id, tool: t.name, status: "failed", summary: msg });
           results.push({ type: "tool_result", id: call.id, content: JSON.stringify({ error: msg, nothing_changed: true }), isError: true });
         }
       }
@@ -226,6 +259,7 @@ export async function runTurn(ctx: Ctx, input: { conversationId?: string | null;
       changed: false,
       cardsAdded: [],
       retryable: true,
+      model: modelName(usedProvider),
       user: { id: `u-${userMsg.id}`, role: "user", content: text, createdAt: now, actions: [] },
       assistant: { id: `err-${userMsg.id}`, role: "assistant", content: finalText, createdAt: now, actions: [], error: true },
     };
@@ -244,6 +278,7 @@ export async function runTurn(ctx: Ctx, input: { conversationId?: string | null;
     conversationId,
     changed: changed || cardsAdded.length > 0,
     cardsAdded,
+    model: modelName(usedProvider),
     user: { id: userMsg.id, role: "user", content: text, createdAt: userMsg.created_at.toISOString(), actions: [] },
     assistant: { id: asst.id, role: "assistant", content: finalText, createdAt: asst.created_at.toISOString(), actions: actions.map(toView), error: failed },
   };

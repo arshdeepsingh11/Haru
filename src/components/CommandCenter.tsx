@@ -49,6 +49,59 @@ function bold(s: string) {
 }
 
 type Msg = MessageView & { retryText?: string; cards?: CardKey[] };
+type Progress = { id: string; tool: string; status: "running" | "done" | "failed"; summary?: string };
+
+/** What Haru is doing right now, in the user's words. */
+const TOOL_LABEL: Record<string, string> = {
+  create_job: "Saving your job",
+  update_job: "Updating your job",
+  create_shift: "Adding a shift",
+  create_shifts_batch: "Adding your shifts",
+  create_bill: "Adding a bill",
+  update_bill: "Updating a bill",
+  create_debt: "Adding a debt",
+  create_savings_goal: "Creating a goal",
+  create_account: "Adding an account",
+  set_account_balance: "Updating a balance",
+  record_paycheck: "Recording your paycheck",
+  record_debt_payment: "Recording a payment",
+  create_expense: "Recording spending",
+  remember: "Remembering that",
+  build_dashboard: "Updating your dashboard",
+  get_payoff_plan: "Working out your payoff plan",
+  check_affordability: "Checking what you can afford",
+  get_paycheck_forecast: "Checking your paycheck",
+  update_preferences: "Saving your settings",
+  complete_setup: "Finishing setup",
+  set_shift_attendance: "Updating your shift",
+  checkout_shift: "Logging your hours",
+};
+const firstSentence = (s: string) => s.split(/(?<=\.)\s/)[0];
+
+type StreamEvent = { type: "thinking" } | { type: "tool"; id: string; tool: string; status: Progress["status"]; summary?: string } | { type: "done"; result: TurnPayload } | { type: "error"; error: string };
+type TurnPayload = { conversationId: string; user: MessageView; assistant: MessageView; changed: boolean; cardsAdded: CardKey[]; retryable?: boolean; model?: string };
+
+/** Read the server's event stream for one turn; resolves with the final result. */
+async function readTurnStream(body: ReadableStream<Uint8Array>, onEvent: (e: StreamEvent) => void): Promise<TurnPayload> {
+  const reader = body.getReader();
+  const dec = new TextDecoder();
+  let buf = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (value) buf += dec.decode(value, { stream: true });
+    let i: number;
+    while ((i = buf.indexOf("\n\n")) !== -1) {
+      const chunk = buf.slice(0, i).trim();
+      buf = buf.slice(i + 2);
+      if (!chunk.startsWith("data:")) continue;
+      const e = JSON.parse(chunk.slice(5)) as StreamEvent;
+      if (e.type === "done") return e.result;
+      if (e.type === "error") throw new Error(e.error);
+      onEvent(e);
+    }
+    if (done) throw new Error("Haru stopped before finishing. Anything already saved is on your dashboard.");
+  }
+}
 
 export interface CommandCenterProps {
   prefill: string | null;
@@ -81,6 +134,14 @@ export function CommandCenter(p: CommandCenterProps) {
   const [speaking, setSpeaking] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [model, setModel] = useState<string | null>(null);
+  const [progress, setProgress] = useState<Progress[]>([]);
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (!busy) return setSlow(false);
+    const t = setTimeout(() => setSlow(true), 9000);
+    return () => clearTimeout(t);
+  }, [busy]);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -94,6 +155,7 @@ export function CommandCenter(p: CommandCenterProps) {
       setConversationId(j.conversation.id);
       setMessages(j.conversation.messages);
       setConversations(j.conversations);
+      if (j.model) setModel(j.model);
     } catch (e) {
       setLoadError((e as Error).message);
     } finally {
@@ -137,12 +199,19 @@ export function CommandCenter(p: CommandCenterProps) {
       const optimistic: Msg = { id: `tmp-${Date.now()}`, role: "user", content: body, createdAt: new Date().toISOString(), actions: [] };
       setMessages((m) => [...m.filter((x) => !x.retryText), optimistic]);
       try {
-        const res = await fetch("/api/ai/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text: body, conversationId }) });
-        const j = await res.json();
-        if (!res.ok) throw new Error(j.error ?? "Haru couldn't process that. Nothing was changed.");
+        setProgress([]);
+        const res = await fetch("/api/ai/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text: body, conversationId, stream: true }), signal: AbortSignal.timeout(75_000) });
+        if (!res.ok || !res.body) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error((err as { error?: string }).error ?? "Haru couldn't process that. Nothing was changed.");
+        }
+        const j = await readTurnStream(res.body, (e) => {
+          if (e.type === "tool") setProgress((p) => [...p.filter((x) => x.id !== e.id), { id: e.id, tool: e.tool, status: e.status, summary: e.summary }]);
+        });
         setConversationId(j.conversationId);
         const assistant: Msg = { ...j.assistant, cards: j.cardsAdded, retryText: j.retryable ? body : undefined };
         setMessages((m) => [...m.filter((x) => x.id !== optimistic.id), j.retryable ? { ...optimistic, id: j.user.id } : j.user, assistant]);
+        if (j.model) setModel(j.model);
         if (j.cardsAdded?.length) onCardsAdded(j.cardsAdded);
         if (j.changed) router.refresh();
         if (!j.retryable) {
@@ -153,10 +222,11 @@ export function CommandCenter(p: CommandCenterProps) {
         const msg = (e as Error).message;
         setMessages((m) => [
           ...m,
-          { id: `err-${Date.now()}`, role: "assistant", content: /fetch|network/i.test(msg) ? "Haru couldn't reach the server." : msg, createdAt: new Date().toISOString(), actions: [], error: true, retryText: body },
+          { id: `err-${Date.now()}`, role: "assistant", content: /timeout|abort/i.test(msg) ? "Haru took too long to answer. Anything already saved is on your dashboard." : /fetch|network/i.test(msg) ? "Haru couldn't reach the server." : msg, createdAt: new Date().toISOString(), actions: [], error: true, retryText: body },
         ]);
       } finally {
         setBusy(false);
+        setProgress([]);
       }
     },
     [text, busy, conversationId, onCardsAdded, router],
@@ -207,7 +277,7 @@ export function CommandCenter(p: CommandCenterProps) {
           {!firstRun && (
             <>
               <p className="font-semibold leading-tight">Haru</p>
-              <p className="truncate text-xs text-ink-3">{busy ? "Thinking…" : setup ? "Setting up" : "Your money coach"}</p>
+              <p className="truncate text-xs text-ink-3">{busy ? "Thinking…" : model ?? (setup ? "Setting up" : "Your money coach")}</p>
             </>
           )}
         </div>
@@ -346,9 +416,19 @@ export function CommandCenter(p: CommandCenterProps) {
                 </li>
               );
             })}
+            {busy && progress.length > 0 && (
+              <li className="grid gap-1.5" aria-live="polite">
+                {progress.map((p) => (
+                  <p key={p.id} className={`msg-in flex items-start gap-2 text-sm ${p.status === "failed" ? "text-brick" : p.status === "done" ? "text-ink-2" : "text-ink-3"}`}>
+                    <span className="mt-0.5 shrink-0">{p.status === "done" ? <Check size={14} className="text-iris" /> : p.status === "failed" ? <CircleAlert size={14} /> : <span className="block h-3.5 w-3.5 animate-spin rounded-full border-2 border-iris/30 border-t-iris" />}</span>
+                    <span className="min-w-0">{p.status === "running" ? TOOL_LABEL[p.tool] ?? "Working on it" : firstSentence(p.summary ?? TOOL_LABEL[p.tool] ?? "Done")}</span>
+                  </p>
+                ))}
+              </li>
+            )}
             {busy && (
               <li className="flex items-center gap-2.5 text-sm text-ink-3">
-                <span className="aurora-text font-semibold">Haru is thinking</span>
+                <span className="aurora-text font-semibold">{slow ? "Still working on it" : "Haru is thinking"}</span>
                 <span className="flex gap-1" aria-hidden>
                   <i className="h-1.5 w-1.5 animate-bounce rounded-full bg-iris [animation-delay:-0.3s]" />
                   <i className="h-1.5 w-1.5 animate-bounce rounded-full bg-lagoon [animation-delay:-0.15s]" />
