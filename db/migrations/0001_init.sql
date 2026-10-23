@@ -66,3 +66,15 @@ create table jobs (
   check (pay_frequency not in ('weekly','biweekly') or period_anchor_date is not null)
 );
 create index jobs_user_idx on jobs(user_id);
+
+create table job_wages (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null,
+  job_id uuid not null,
+  rate_cents integer not null check (rate_cents > 0 and rate_cents < 100000000),
+  effective_from date not null,
+  created_at timestamptz not null default now(),
+  foreign key (job_id, user_id) references jobs(id, user_id) on delete cascade,
+  unique (job_id, effective_from)
+);
+create index job_wages_job_idx on job_wages(job_id, effective_from desc);
