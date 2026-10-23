@@ -24,7 +24,7 @@ const monthTitle = (m: string) => new Date(`${m}-15T12:00:00Z`).toLocaleDateStri
 const dayTitle = (d: string, today: string) =>
   d === today ? "Today" : d === addDays(today, 1) ? "Tomorrow" : new Date(`${d}T12:00:00Z`).toLocaleDateString("en-CA", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" });
 
-export function ScheduleSheet({ open, onClose, onScan }: { open: boolean; onClose: () => void; onScan: () => void }) {
+export function ScheduleSheet({ open, onClose, onScan, onOpenJobs }: { open: boolean; onClose: () => void; onScan: () => void; onOpenJobs: () => void }) {
   const [month, setMonth] = useState<string | undefined>(undefined);
   const [data, setData] = useState<MonthData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -64,13 +64,14 @@ export function ScheduleSheet({ open, onClose, onScan }: { open: boolean; onClos
           }}
           reload={() => refresh(month)}
           onScan={onScan}
+          onOpenJobs={onOpenJobs}
         />
       )}
     </Sheet>
   );
 }
 
-function Calendar({ data, selected, onSelect, onMonth, reload, onScan }: { data: MonthData; selected: string; onSelect: (d: string) => void; onMonth: (m: string) => void; reload: () => void; onScan: () => void }) {
+function Calendar({ data, selected, onSelect, onMonth, reload, onScan, onOpenJobs }: { data: MonthData; selected: string; onSelect: (d: string) => void; onMonth: (m: string) => void; reload: () => void; onScan: () => void; onOpenJobs: () => void }) {
   const money = useMoney();
   const [adding, setAdding] = useState<null | "shift" | "extra">(null);
   const color = useMemo(() => new Map(data.jobs.map((j) => [j.id, JOB_BG[j.color % JOB_BG.length]])), [data.jobs]);
@@ -122,12 +123,14 @@ function Calendar({ data, selected, onSelect, onMonth, reload, onScan }: { data:
                 aria-pressed={isSel}
                 className={`relative flex min-h-[3.5rem] flex-col rounded-xl px-1 pb-1 pt-1 text-left transition ${isSel ? "bg-ink text-white" : isToday ? "bg-violet-soft" : "hover:bg-paper-2"} ${inMonth(d) ? "" : "opacity-35"}`}
               >
-                <span className={`text-xs font-semibold ${isToday && !isSel ? "text-iris" : ""}`}>{Number(d.slice(8))}</span>
-                {pay.length > 0 && (
-                  <span className="absolute right-1 top-1 grid h-4 w-4 place-items-center rounded-full text-[0.6rem] font-bold text-white" style={{ background: "var(--aurora)" }} aria-hidden>
-                    $
-                  </span>
-                )}
+                <span className="flex items-center gap-1">
+                  <span className={`text-xs font-semibold ${isToday && !isSel ? "text-iris" : ""}`}>{Number(d.slice(8))}</span>
+                  {pay.length > 0 && (
+                    <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full text-[0.6rem] font-bold text-white" style={{ background: "var(--aurora)" }} aria-hidden>
+                      $
+                    </span>
+                  )}
+                </span>
                 <span className="mt-auto grid gap-0.5">
                   {list.slice(0, 3).map((s) => (
                     <span key={s.id} className={`block h-1.5 rounded-full ${s.status === "missed" || s.attendance === "not_going" ? "bg-ink-3/40" : (color.get(s.jobId) ?? "bg-iris")} ${s.status === "scheduled" ? "opacity-70" : ""}`} />
@@ -144,7 +147,7 @@ function Calendar({ data, selected, onSelect, onMonth, reload, onScan }: { data:
 
       {/* Legend */}
       {data.jobs.length > 0 && (
-        <div className="flex flex-wrap gap-x-4 gap-y-1 px-1 text-xs text-ink-2">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-xs text-ink-2">
           {data.jobs.map((j) => (
             <span key={j.id} className="inline-flex items-center gap-1.5">
               <span className={`h-2 w-2 rounded-full ${color.get(j.id)}`} /> {j.name}
@@ -156,6 +159,9 @@ function Calendar({ data, selected, onSelect, onMonth, reload, onScan }: { data:
             </span>
             Payday
           </span>
+          <button className="ml-auto font-semibold text-iris" onClick={onOpenJobs}>
+            Jobs & pay
+          </button>
         </div>
       )}
 
