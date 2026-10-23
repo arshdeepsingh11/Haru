@@ -11,7 +11,7 @@
 <br />
 <img alt="Gemini with fallback" src="https://img.shields.io/badge/AI-Gemini%20%2B%20fallback-494d4f?style=for-the-badge&logo=googlegemini&logoColor=white" />
 <img alt="Web Push" src="https://img.shields.io/badge/Web%20Push-VAPID-26292b?style=for-the-badge&logo=pwa&logoColor=white" />
-<img alt="Tests" src="https://img.shields.io/badge/tests-98%20passing-8a6a2f?style=for-the-badge" />
+<img alt="Tests" src="https://img.shields.io/badge/tests-110%20passing-8a6a2f?style=for-the-badge" />
 <img alt="PWA" src="https://img.shields.io/badge/phone--first-PWA-c9a464?style=for-the-badge" />
 
 <h3>Work for Haru.</h3>
@@ -128,6 +128,10 @@ Pick a country, tick what you care about (stocks, ETFs, gold, silver, mutual fun
 - **Numbers by code, words by AI.** Returns, 5-year CAGR, 52-week range, swings and drawdown are calculated, then Haru writes a short take that also looks at your budget and debts. It always says: *this is an AI estimate, I may be wrong, not financial advice.*
 - **News that matches you.** The Economic Times, Mint, BusinessLine, Aaj Tak, CBC, Financial Post, The Globe and Mail, The New York Times, The Washington Post and BBC, tagged to countries, interests and assets, refreshed every 15 minutes.
 - **It learns.** What you open, save and ask about shapes what you see first, with a three-week memory.
+- **Every Indian stock, free.** Prices come from NSE's official daily file (one download covers every stock, ETF and the Nifty indexes); free keys are kept for charts, so nothing hits a limit.
+- **SIP & goals.** "₹10,000 a month for 10 years" → what it could grow to, in today's money too, and what share of your real free money it takes. Or the other way: how much a month for a goal.
+- **Send home.** Today's official CAD→INR rate against the last 90 days and the year, and what sending $X a month does to your budget and debt-free date.
+- **Price alerts.** "Tell me when gold goes above ₹1,30,000": checked every 5 minutes, sent as a notification.
 - **Things without a live price** (land, shops, real estate, deposits) get context, news and Haru's take instead of fake numbers.
 
 ## Under the hood
@@ -173,7 +177,7 @@ flowchart LR
 ```bash
 npm install
 cp .env.example .env.local        # Supabase, DATABASE_URL, ANTHROPIC_API_KEY (+ GEMINI_API_KEY backup), VAPID, market data keys
-npm run db:migrate                # 0001 … 0006 (invest)
+npm run db:migrate                # 0001 … 0007 (invest, alerts)
 npm run dev
 ```
 

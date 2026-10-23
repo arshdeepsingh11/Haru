@@ -20,6 +20,7 @@ Every financial number is computed by deterministic code from stored records. Th
 | Haru's memory of each person | `db/migrations/0004_memory.sql` |
 | Confirmed paydays | `db/migrations/0005_pay_confirmed.sql` |
 | Invest: profiles, watchlist, signals, market cache, news | `db/migrations/0006_invest.sql` |
+| Price alerts (delivered through the reminder queue) | `db/migrations/0007_invest_alerts.sql` |
 | Market data (multi-provider, cached), news feeds, ranking, AI take | `src/lib/invest/*`, `src/lib/server/invest/*` |
 | Database integrity tests (14) | `db/tests/integrity.sql` |
 | Pure financial / payroll / time-zone logic | `src/lib/domain/*` |
@@ -27,7 +28,7 @@ Every financial number is computed by deterministic code from stored records. Th
 | AI provider abstraction, tools, agent loop | `src/lib/ai/*` |
 | Push delivery + durable scheduler | `src/lib/server/notifications/*`, `public/sw.js` |
 | UI: dashboard, invest, command center, records, settings, onboarding | `src/components/*`, `src/app/*` |
-| Tests: unit (62), integration (36), against the real postgres.js driver | `tests/` |
+| Tests: unit (72), integration (38), against the real postgres.js driver | `tests/` |
 
 **Stack:** Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · Supabase (Postgres + Auth) · postgres.js with plain SQL migrations · Zod 4 · Anthropic Claude (behind `src/lib/ai/provider.ts`) · Recharts · web-push.
 
@@ -138,7 +139,7 @@ Reminder categories and timing (minutes before shifts, the time to nudge you to 
 | `HARU_GEMINI_MODEL` | no | Default `gemini-3.8-flash`. |
 | `HARU_AI_FALLBACK_MODELS` | optional | Comma-separated Gemini models tried when the main one is busy. Default: `gemini-3.6-flash,gemini-2.5-flash` (flash-lite is left out: it drops details). Empty string disables fallback. |
 | `TWELVE_DATA_API_KEY` | for Invest (free) | US stocks/ETFs, FX, crypto, gold/silver, live. Server only. |
-| `ALPHA_VANTAGE_API_KEY` | for Invest (free) | BSE (India) and TSX (Canada) end-of-day history. Server only. |
+| `ALPHA_VANTAGE_API_KEY` | for Invest (free) | Price history for Indian and Canadian stocks (charts). Indian prices themselves come from NSE's official daily file, no key. Server only. |
 | `EODHD_API_KEY` | optional (paid) | Delayed NSE/TSX quotes and Nifty/Sensex/TSX indexes. Server only. |
 | `NYT_API_KEY` | optional | NYT Top Stories API on top of the RSS feeds. Server only. |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | for push | Public. |
