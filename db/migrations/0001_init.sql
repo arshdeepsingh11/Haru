@@ -173,3 +173,18 @@ create table work_opportunities (
   check (status <> 'scheduled' or work_date is not null)
 );
 create index opp_user_idx on work_opportunities(user_id, status);
+
+create table debts (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references app_users(id) on delete cascade,
+  name text not null,
+  creditor text,
+  starting_balance_cents bigint not null check (starting_balance_cents > 0),
+  opened_on date not null default current_date,
+  interest_rate_percent numeric(6,3) check (interest_rate_percent >= 0),
+  minimum_payment_cents bigint check (minimum_payment_cents >= 0),
+  status text not null default 'active' check (status in ('active','paid_off','archived')),
+  notes text,
+  created_at timestamptz not null default now(),
+  unique (id, user_id)
+);
