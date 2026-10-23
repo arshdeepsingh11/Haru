@@ -33,6 +33,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
         initialAsk={sp.ask ?? null}
         initialSheet={sp.settings ? "settings" : sp.schedule ? "schedule" : null}
         initialCheckout={sp.checkout ?? null}
+        initialView={sp.view === "invest" ? "invest" : "home"}
         vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null}
         aiConfigured={aiConfigured()}
       />

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Bell, CalendarDays, FolderOpen, Home, Settings } from "lucide-react";
+import { Bell, CalendarDays, FolderOpen, Home, Settings, TrendingUp } from "lucide-react";
 import type { DashboardData } from "@/lib/server/services/dashboard";
 import type { CardKey } from "@/lib/dashboard-registry";
 import { Wordmark } from "./Wordmark";
@@ -13,6 +13,7 @@ import { InboxSheet, SettingsSheet } from "./SettingsSheet";
 import { ScheduleSheet } from "./ScheduleSheet";
 import { ScanSheet } from "./ScanSheet";
 import { JobsSheet } from "./JobsSheet";
+import { InvestView } from "./invest/InvestView";
 import { CheckoutCard } from "./home/ShiftHome";
 import { CurrencyProvider, Sheet, ToastProvider } from "./ui";
 
@@ -28,9 +29,11 @@ export function AppShell({
   initialAsk,
   initialSheet,
   initialCheckout,
+  initialView = "home",
   vapidPublicKey,
   aiConfigured,
 }: {
+  initialView?: "home" | "invest";
   data: DashboardData;
   email: string | null;
   initialAsk: string | null;
@@ -42,6 +45,16 @@ export function AppShell({
   // First run: no cards and setup not finished → the whole app is the conversation.
   const genesis = !data.onboarded && data.cards.length === 0;
   const [chatOpen, setChatOpen] = useState(Boolean(initialAsk) || !data.onboarded);
+  const [view, setView] = useState<"home" | "invest">(initialView);
+  const go = useCallback((v: "home" | "invest") => {
+    setView(v);
+    window.scrollTo({ top: 0 });
+    try {
+      history.replaceState(null, "", v === "invest" ? "/?view=invest" : "/");
+    } catch {
+      /* ignore */
+    }
+  }, []);
   const [prefill, setPrefill] = useState<string | null>(initialAsk ? (ASK_PREFILL[initialAsk] ?? null) : null);
   const [autoSend, setAutoSend] = useState<string | null>(null);
   const [sheet, setSheet] = useState<SheetName>(initialSheet);
@@ -164,11 +177,20 @@ export function AppShell({
                   <a href="/" className="mr-auto py-1" aria-label="HARU home">
                     <Wordmark size={26} />
                   </a>
+                  <button className="btn btn-quiet h-10 w-10 p-0 lg:hidden" onClick={() => openRecords()} aria-label="Records">
+                    <FolderOpen size={19} />
+                  </button>
                   <button className="btn btn-quiet relative h-10 w-10 p-0" onClick={() => setSheet("inbox")} aria-label={`Notifications${data.unreadNotifications ? `, ${data.unreadNotifications} unread` : ""}`}>
                     <Bell size={19} />
                     {data.unreadNotifications > 0 && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-bloom" aria-hidden />}
                   </button>
                   <div className="hidden items-center gap-1 lg:flex">
+                    <button className={`btn ${view === "home" ? "btn-line" : "btn-quiet"}`} onClick={() => go("home")}>
+                      <Home size={17} /> Home
+                    </button>
+                    <button className={`btn ${view === "invest" ? "btn-line" : "btn-quiet"}`} onClick={() => go("invest")}>
+                      <TrendingUp size={17} /> Invest
+                    </button>
                     <button className="btn btn-quiet" onClick={() => setSheet("schedule")}>
                       <CalendarDays size={17} /> Schedule
                     </button>
@@ -182,7 +204,11 @@ export function AppShell({
                 </div>
               </header>
               <main className="mx-auto max-w-2xl px-4 pb-36 pt-3 lg:pb-16">
-                <Dashboard data={data} onAsk={ask} onOpenRecords={openRecords} onOpenSchedule={() => setSheet("schedule")} onOpenJobs={openJobs} fresh={fresh} />
+                {view === "invest" ? (
+                  <InvestView onAsk={ask} />
+                ) : (
+                  <Dashboard data={data} onAsk={ask} onOpenRecords={openRecords} onOpenSchedule={() => setSheet("schedule")} onOpenJobs={openJobs} fresh={fresh} />
+                )}
               </main>
             </div>
 
@@ -199,21 +225,21 @@ export function AppShell({
         {/* Phone dock: Haru sits in the middle. */}
         {!genesis && !chatOpen && (
           <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-40 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden">
-            <div className="mx-auto flex max-w-md items-end justify-between rounded-[28px] border border-white bg-white/95 px-3 py-2 shadow-[0_20px_40px_-20px_rgb(40_44_110/0.45)] ring-1 ring-ink/5 backdrop-blur-2xl">
-              <DockButton label="Home" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} active>
+            <div className="glass-strong mx-auto flex max-w-md items-end justify-between rounded-[28px] px-3 py-2">
+              <DockButton label="Home" onClick={() => (view === "home" ? window.scrollTo({ top: 0, behavior: "smooth" }) : go("home"))} active={view === "home"}>
                 <Home size={21} />
               </DockButton>
-              <DockButton label="Schedule" onClick={() => setSheet("schedule")}>
-                <CalendarDays size={21} />
+              <DockButton label="Invest" onClick={() => (view === "invest" ? window.scrollTo({ top: 0, behavior: "smooth" }) : go("invest"))} active={view === "invest"}>
+                <TrendingUp size={21} />
               </DockButton>
               <button className="-mt-8 grid justify-items-center gap-1 text-[0.68rem] font-semibold text-ink" onClick={() => setChatOpen(true)} aria-label="Talk to Haru">
-                <span className="rounded-full bg-white p-1.5 shadow-[0_14px_30px_-12px_rgb(80_60_230/0.7)]">
+                <span className="rounded-full bg-[#2e3133] p-1.5 shadow-[0_14px_30px_-12px_rgb(20_22_23/0.8)] ring-1 ring-white/10">
                   <AuroraOrb size={54} />
                 </span>
                 Haru
               </button>
-              <DockButton label="Records" onClick={() => openRecords()}>
-                <FolderOpen size={21} />
+              <DockButton label="Schedule" onClick={() => setSheet("schedule")}>
+                <CalendarDays size={21} />
               </DockButton>
               <DockButton label="Settings" onClick={() => setSheet("settings")}>
                 <Settings size={21} />
