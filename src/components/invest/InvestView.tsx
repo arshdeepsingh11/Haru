@@ -8,6 +8,8 @@ import { Sheet, useToast } from "../ui";
 import { Sparkline } from "./PriceChart";
 import { AssetSheet } from "./AssetSheet";
 import { InsightCard, NewsList } from "./parts";
+import { PlanCards, SendHomeSheet, SipSheet } from "./Planners";
+import { AlertsList } from "./Alerts";
 import { fmtPct, fmtPrice } from "./format";
 
 // The Invest tab: pick a country, pick what you care about, and see live prices, charts, news and Haru's read.
@@ -37,6 +39,7 @@ export function InvestView({ onAsk }: { onAsk: (text: string) => void }) {
   const [searching, setSearching] = useState(false);
   const [editing, setEditing] = useState(false);
   const [moreNews, setMoreNews] = useState(false);
+  const [planner, setPlanner] = useState<"sip" | "send" | null>(null);
   const loadId = useRef(0);
 
   const patchQuotes = useCallback((quotes: QuoteResult[]) => {
@@ -51,19 +54,40 @@ export function InvestView({ onAsk }: { onAsk: (text: string) => void }) {
       loadId.current = id;
       setLoading(true);
       setError(null);
+      // Paint the last view of this country at once (this device only), then refresh it.
+      try {
+        const saved = localStorage.getItem(`haru.invest.v1.${c}`);
+        if (saved) setData((d) => (d?.country === c ? d : (JSON.parse(saved) as InvestOverview)));
+      } catch {
+        /* storage unavailable: just wait for the network */
+      }
       try {
         const res = await fetch(`/api/invest?country=${c}`);
         const j = await res.json();
         if (!res.ok) throw new Error(j.error ?? "Couldn't load markets.");
         if (id !== loadId.current) return;
-        setData(j);
-        // Fill in prices that weren't ready (free plans are rate-limited), a few at a time.
+        // Keep prices already on screen until fresher ones arrive.
+        setData((prev) => {
+          if (!prev || prev.country !== c) return j;
+          const old = new Map([...prev.pulse, ...prev.saved, ...prev.sections.flatMap((s) => s.assets)].map((r) => [r.key, r]));
+          const keep = (r: AssetRow) => (isQ(r.quote) || !old.get(r.key) || !isQ(old.get(r.key)!.quote) ? r : { ...r, quote: old.get(r.key)!.quote, spark: r.spark ?? old.get(r.key)!.spark });
+          return { ...j, pulse: j.pulse.map(keep), saved: j.saved.map(keep), sections: j.sections.map((s: InvestOverview["sections"][number]) => ({ ...s, assets: s.assets.map(keep) })) };
+        });
+        // Fill in prices that weren't ready, three small batches at a time.
         const all: AssetRow[] = [...j.pulse, ...j.saved, ...j.sections.flatMap((s: { assets: AssetRow[] }) => s.assets)];
         const missing = [...new Set(all.filter((r) => !isQ(r.quote) || r.quote.stale).map((r) => r.key))];
-        for (let i = 0; i < missing.length && id === loadId.current; i += 8) {
-          const r = await fetch("/api/invest/quotes", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ keys: missing.slice(i, i + 8) }) });
-          if (r.ok) patchQuotes((await r.json()).quotes);
-        }
+        const batches: string[][] = [];
+        for (let i = 0; i < missing.length; i += 6) batches.push(missing.slice(i, i + 6));
+        let next = 0;
+        await Promise.all(
+          Array.from({ length: Math.min(3, batches.length) }, async () => {
+            while (next < batches.length && id === loadId.current) {
+              const b = batches[next++];
+              const r = await fetch("/api/invest/quotes", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ keys: b }) }).catch(() => null);
+              if (r?.ok && id === loadId.current) patchQuotes((await r.json()).quotes);
+            }
+          }),
+        );
       } catch (e) {
         if (id === loadId.current) setError((e as Error).message);
       } finally {
@@ -72,6 +96,15 @@ export function InvestView({ onAsk }: { onAsk: (text: string) => void }) {
     },
     [patchQuotes],
   );
+
+  useEffect(() => {
+    if (!data || loading) return;
+    try {
+      localStorage.setItem(`haru.invest.v1.${data.country}`, JSON.stringify(data));
+    } catch {
+      /* full or unavailable: fine */
+    }
+  }, [data, loading]);
 
   useEffect(() => {
     try {
@@ -148,6 +181,8 @@ export function InvestView({ onAsk }: { onAsk: (text: string) => void }) {
             ))}
           </div>
 
+          <PlanCards onSip={() => setPlanner("sip")} onSend={() => setPlanner("send")} />
+
           {/* Interests */}
           <section className="grid gap-2">
             <div className="flex items-baseline justify-between px-1">
@@ -200,6 +235,8 @@ export function InvestView({ onAsk }: { onAsk: (text: string) => void }) {
             </section>
           )}
 
+          <AlertsList refreshKey={open} />
+
           {/* News */}
           <section className="grid gap-2.5">
             <div className="flex items-baseline justify-between px-1">
@@ -229,6 +266,8 @@ export function InvestView({ onAsk }: { onAsk: (text: string) => void }) {
         </>
       )}
 
+      <SipSheet open={planner === "sip"} onClose={() => setPlanner(null)} country={country} />
+      <SendHomeSheet open={planner === "send"} onClose={() => setPlanner(null)} />
       <AssetSheet assetKey={open?.key ?? null} title={open?.name} onClose={() => setOpen(null)} onAsk={onAsk} />
       <SearchSheet
         open={searching}
@@ -280,7 +319,7 @@ function ConnectData({ country }: { country: Country }) {
       <p className="flex items-center gap-2 font-semibold">
         <KeyRound size={17} className="text-iris" /> Connect live market data
       </p>
-      <p className="text-sm text-ink-2">Prices need a free data key (2 minutes). Rates and currencies from the Bank of Canada already work.</p>
+      <p className="text-sm text-ink-2">Some prices need a free data key (2 minutes). Indian stocks (NSE official close), Bank of Canada rates and currencies already work.</p>
       <ol className="grid gap-1.5 text-sm">
         <li>
           1. <b>Twelve Data</b> (free): US stocks, ETFs, gold, currencies, crypto, live. Sign up at twelvedata.com and copy your API key.

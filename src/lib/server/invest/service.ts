@@ -143,7 +143,7 @@ async function sparkFor(a: Asset): Promise<number[] | null> {
 }
 
 async function rows(assets: Asset[], live: boolean): Promise<AssetRow[]> {
-  const quotes = live ? await settleWithin(assets, (a) => getQuote(a), { concurrency: 4, deadlineMs: 6000 }) : await Promise.all(assets.map(peekQuote));
+  const quotes = live ? await settleWithin(assets, (a) => getQuote(a), { concurrency: 6, deadlineMs: 1500 }) : await Promise.all(assets.map(peekQuote));
   return Promise.all(
     assets.map(async (a, i) => ({ key: a.key, name: a.name, short: a.short, kind: a.kind, currency: a.currency, unit: a.unit, quote: quotes[i] ?? (await peekQuote(a)), spark: await sparkFor(a) })),
   );
@@ -159,7 +159,9 @@ export async function overview(ctx: Ctx, country: CountryCode) {
   const aff = affinity(sig);
   sections.sort((a, b) => (aff.get(b.key) ?? 0) - (aff.get(a.key) ?? 0));
 
-  await refreshNewsIfStale(3000).catch((e) => logError("news.stale", e));
+  // Never make the page wait for news once there is some: refresh in the background (the cron also does it).
+  const pulledBefore = await peek("news:refreshed");
+  await refreshNewsIfStale(pulledBefore ? 0 : 2500).catch((e) => logError("news.stale", e));
   const all = await listNews({ country, limit: 200 });
   const news = rankNews(all, { country, interests: chosen, affinity: aff, limit: 30 });
 

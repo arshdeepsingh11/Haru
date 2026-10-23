@@ -126,7 +126,7 @@ export function PriceChart({
         )}
         {labels.map((i, k) => (
           <text key={k} x={Math.min(Math.max(geo.x(i), 30), pad.l + geo.iw - 30)} y={height - 5} fontSize="10.5" textAnchor="middle" fill="var(--ink-3)">
-            {new Date(data[i].t).toLocaleDateString("en-CA", intraday ? { hour: "numeric", minute: "2-digit" } : data.length > 400 ? { year: "numeric", month: "short" } : { month: "short", day: "numeric" })}
+            {new Date(data[i].t).toLocaleDateString("en-CA", intraday ? { hour: "numeric", minute: "2-digit" } : data[data.length - 1].t - data[0].t > 300 * 86400e3 ? { year: "numeric", month: "short" } : { month: "short", day: "numeric" })}
           </text>
         ))}
         {hover != null && (
