@@ -64,6 +64,18 @@ export function fromGeminiResponse(json: unknown): ChatResponse {
 }
 
 const DUMMY_SIGNATURE = "skip_thought_signature_validator";
+
+/**
+ * Keep thinking short: HARU's tools do the maths, so deep reasoning only adds seconds.
+ * Gemini 3.x takes a thinking level; 2.5 takes a token budget. Override with HARU_AI_THINKING.
+ */
+export function thinkingFor(model: string): Record<string, unknown> {
+  const forced = process.env.HARU_AI_THINKING?.trim();
+  if (/^gemini-2\.5/.test(model)) return { thinkingBudget: /lite/.test(model) ? 0 : 512 };
+  if (forced) return { thinkingLevel: forced };
+  if (/^gemini-3\.(5|6)/.test(model)) return { thinkingLevel: "minimal" };
+  return { thinkingLevel: "low" };
+}
 const RETRYABLE = new Set([500, 502, 503, 504]);
 
 /** When a turn moves to a fallback model, signatures from the first model can't be validated by it. */
@@ -92,6 +104,10 @@ export interface GeminiOptions {
   fallbacks?: string[];
   /** Waits between retries of the same model on 5xx. */
   retryDelaysMs?: number[];
+  /** Longest a single request may take before moving to the next model. */
+  callTimeoutMs?: number;
+  /** Total time one request may spend across retries and fallbacks. */
+  budgetMs?: number;
 }
 
 export class GeminiProvider implements ChatProvider {
@@ -99,6 +115,8 @@ export class GeminiProvider implements ChatProvider {
   private active: string;
   private fallbacks: string[];
   private delays: number[];
+  private callTimeoutMs: number;
+  private budgetMs: number;
 
   constructor(
     private apiKey: string,
@@ -108,7 +126,9 @@ export class GeminiProvider implements ChatProvider {
   ) {
     this.active = model;
     this.fallbacks = (opts.fallbacks ?? []).filter((m) => m && m !== model);
-    this.delays = opts.retryDelaysMs ?? [700, 1600];
+    this.delays = opts.retryDelaysMs ?? [600];
+    this.callTimeoutMs = opts.callTimeoutMs ?? 20_000;
+    this.budgetMs = opts.budgetMs ?? 40_000;
   }
 
   /** The model that answered last (sticky for the rest of this turn). */
@@ -116,14 +136,15 @@ export class GeminiProvider implements ChatProvider {
     return this.active;
   }
 
-  private async post(model: string, body: unknown): Promise<unknown> {
+  private async post(model: string, body: unknown, timeoutMs: number): Promise<unknown> {
     let res: Response;
+    const started = Date.now();
     try {
       res = await this.fetchImpl(`${ENDPOINT}/${encodeURIComponent(model)}:generateContent`, {
         method: "POST",
         headers: { "content-type": "application/json", "x-goog-api-key": this.apiKey },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(45_000),
+        signal: AbortSignal.timeout(timeoutMs),
       });
     } catch (e) {
       console.error(`[haru:gemini] network error (${model}): ${(e as Error).message}`);
@@ -140,21 +161,27 @@ export class GeminiProvider implements ChatProvider {
       console.error(`[haru:gemini] HTTP ${res.status} for model ${model}: ${reason.slice(0, 300)}`);
       throw new GeminiHttpError(res.status, reason);
     }
-    return res.json();
+    const json = await res.json();
+    console.info(`[haru:gemini] ${model} answered in ${((Date.now() - started) / 1000).toFixed(1)}s`);
+    return json;
   }
 
   /**
    * Try the active model (retrying brief overloads), then each fallback model.
    * Quota (429) and overload (5xx) move on to the next model; key and request errors stop at once.
    */
-  private async generate(build: (model: string, switched: boolean) => unknown): Promise<unknown> {
+  private async generate(build: (model: string, switched: boolean, thinking: boolean) => unknown): Promise<unknown> {
     const chain = [this.active, ...[this.model, ...this.fallbacks].filter((m) => m !== this.active)];
+    const deadline = Date.now() + this.budgetMs;
     let last: GeminiHttpError | null = null;
     for (const model of chain) {
       const switched = model !== this.active;
+      let thinking = true;
       for (let attempt = 0; attempt <= this.delays.length; attempt++) {
+        const left = deadline - Date.now();
+        if (left < 4_000) break;
         try {
-          const json = await this.post(model, build(model, switched));
+          const json = await this.post(model, build(model, switched, thinking), Math.min(this.callTimeoutMs, left));
           this.active = model;
           return json;
         } catch (e) {
@@ -162,7 +189,14 @@ export class GeminiProvider implements ChatProvider {
           last = err;
           if (/API key|API_KEY|credential|unauthenticated/i.test(err.reason) || err.status === 401 || err.status === 403)
             throw new ProviderUnavailable(`Gemini rejected HARU's API key (${err.status}): ${err.reason.slice(0, 160)}`);
-          const retrySame = (RETRYABLE.has(err.status) || err.status === 0) && attempt < this.delays.length;
+          // A model that doesn't accept the thinking setting: ask again without it.
+          if (err.status === 400 && thinking && /thinking/i.test(err.reason)) {
+            thinking = false;
+            attempt--;
+            continue;
+          }
+          // A slow model (timeout) goes straight to the next one; brief overloads are retried.
+          const retrySame = RETRYABLE.has(err.status) && attempt < this.delays.length;
           if (retrySame) {
             await new Promise((r) => setTimeout(r, this.delays[attempt]));
             continue;
@@ -171,35 +205,37 @@ export class GeminiProvider implements ChatProvider {
         }
       }
       if (last && !(RETRYABLE.has(last.status) || last.status === 0 || last.status === 429 || last.status === 404)) break;
+      if (deadline - Date.now() < 4_000) break;
     }
     const tried = chain.length > 1 ? ` (tried ${chain.join(", ")})` : "";
-    const e = last!;
+    const e = last ?? new GeminiHttpError(0, "timed out");
     if (e.status === 429)
       throw new ProviderUnavailable(`Gemini's usage limit was reached${tried}. The free tier allows a limited number of requests; try again in a minute or use a paid key.`);
     if (e.status === 404) throw new ProviderUnavailable(`Gemini model "${this.model}" isn't available to this key. Set HARU_AI_MODEL (e.g. gemini-3.6-flash) and restart.`);
     if (RETRYABLE.has(e.status)) throw new ProviderUnavailable(`Gemini is overloaded right now${tried}. Give it a minute and tap Retry.`);
-    if (e.status === 0) throw new ProviderUnavailable(`HARU couldn't reach Gemini (${e.reason}).`);
+    if (e.status === 0) throw new ProviderUnavailable(e.reason === "timed out" ? `Gemini is answering too slowly right now${tried}. Tap Retry, or set HARU_AI_MODEL to a faster model.` : `HARU couldn't reach Gemini (${e.reason}).`);
     throw new ProviderUnavailable(`Gemini error ${e.status}: ${e.reason.slice(0, 160) || "no details"}`);
   }
 
   async chat(req: { system: string; messages: ChatMessage[]; tools: ToolSpec[]; maxTokens?: number }): Promise<ChatResponse> {
     const contents = toGeminiContents(req.messages);
-    const json = await this.generate((_model, switched) => ({
+    const json = await this.generate((model, switched, thinking) => ({
       systemInstruction: { parts: [{ text: req.system }] },
       contents: switched ? resignContents(contents) : contents,
       tools: [{ functionDeclarations: req.tools.map((t) => ({ name: t.name, description: t.description, parametersJsonSchema: t.inputSchema })) }],
       toolConfig: { functionCallingConfig: { mode: "AUTO" } },
-      generationConfig: { maxOutputTokens: req.maxTokens ?? 2048 },
+      // Thought tokens count toward the output limit, so leave room for the actual reply.
+      generationConfig: { maxOutputTokens: req.maxTokens ?? 8192, ...(thinking ? { thinkingConfig: thinkingFor(model) } : {}) },
     }));
     return fromGeminiResponse(json);
   }
 
   /** Read an image (a photographed schedule) and answer with JSON text. */
   async vision(req: { system: string; prompt: string; image: { mime: string; base64: string } }): Promise<string> {
-    const json = await this.generate(() => ({
+    const json = await this.generate((model, _switched, thinking) => ({
       systemInstruction: { parts: [{ text: req.system }] },
       contents: [{ role: "user", parts: [{ inlineData: { mimeType: req.image.mime, data: req.image.base64 } }, { text: req.prompt }] }],
-      generationConfig: { responseMimeType: "application/json", maxOutputTokens: 4096 },
+      generationConfig: { responseMimeType: "application/json", maxOutputTokens: 8192, ...(thinking ? { thinkingConfig: thinkingFor(model) } : {}) },
     }));
     const parts = (json as { candidates?: { content?: { parts?: { text?: string }[] } }[] }).candidates?.[0]?.content?.parts ?? [];
     return parts.map((p) => p.text ?? "").join("");

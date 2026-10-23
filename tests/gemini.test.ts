@@ -100,3 +100,33 @@ test("gemini: quota on one model moves on; all busy says so plainly", async () =
   const all = new GeminiProvider("k", "main", fakeFetch([busy], []), { fallbacks: ["b2"], retryDelaysMs: [0] });
   await assert.rejects(all.chat({ system: "", messages: [], tools }), (e: unknown) => e instanceof ProviderUnavailable && /overloaded right now \(tried main, b2\)/.test((e as Error).message));
 });
+
+test("gemini: thinking is kept short per model, and dropped if a model rejects it", async () => {
+  const { thinkingFor } = await import("../src/lib/ai/gemini");
+  assert.deepEqual(thinkingFor("gemini-3.8-flash"), { thinkingLevel: "low" });
+  assert.deepEqual(thinkingFor("gemini-3.5-flash-lite"), { thinkingLevel: "minimal" });
+  assert.deepEqual(thinkingFor("gemini-2.5-flash"), { thinkingBudget: 512 });
+  const seen: { url: string; body: any; headers: any }[] = [];
+  const p = new GeminiProvider("k", "gemini-3.8-flash", fakeFetch([{ status: 400, body: JSON.stringify({ error: { message: "Unknown name thinkingLevel" } }) }, ok], seen), { retryDelaysMs: [0] });
+  await p.chat({ system: "", messages: [], tools });
+  assert.equal(seen[0].body.generationConfig.thinkingConfig.thinkingLevel, "low");
+  assert.equal(seen[0].body.generationConfig.maxOutputTokens, 8192);
+  assert.equal(seen[1].body.generationConfig.thinkingConfig, undefined);
+});
+
+test("gemini: a model that hangs is abandoned for the next one", async () => {
+  let n = 0;
+  const hang = (async (url: string, init: RequestInit) => {
+    n++;
+    if (String(url).includes("/slow:")) {
+      return new Promise<Response>((_, rej) => init.signal?.addEventListener("abort", () => rej(Object.assign(new Error("t"), { name: "TimeoutError" }))));
+    }
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "Hi" }] } }] }), { status: 200 });
+  }) as unknown as typeof fetch;
+  const p = new GeminiProvider("k", "slow", hang, { fallbacks: ["fast"], retryDelaysMs: [0], callTimeoutMs: 50, budgetMs: 10_000 });
+  const keepAlive = setInterval(() => {}, 20); // AbortSignal.timeout doesn't hold the event loop open
+  const r = await p.chat({ system: "", messages: [], tools }).finally(() => clearInterval(keepAlive));
+  assert.equal(r.content[0].type, "text");
+  assert.equal(p.modelInUse, "fast");
+  assert.equal(n, 2, "no retry of the hanging model");
+});

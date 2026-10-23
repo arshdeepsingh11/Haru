@@ -36,6 +36,14 @@ export const DEFAULT_GEMINI_FALLBACKS = ["gemini-3.6-flash", "gemini-3.5-flash-l
 
 export class ProviderUnavailable extends Error {}
 
+/** The model HARU will ask first, for display ("gemini-3.8-flash"). */
+export function configuredModel(): string | null {
+  const forced = process.env.HARU_AI_PROVIDER?.toLowerCase();
+  if (process.env.GEMINI_API_KEY && forced !== "anthropic") return process.env.HARU_AI_MODEL || "gemini-3.8-flash";
+  if (process.env.ANTHROPIC_API_KEY && forced !== "gemini") return process.env.HARU_AI_MODEL || "claude-sonnet-5-5";
+  return null;
+}
+
 export function aiConfigured(): boolean {
   return Boolean(process.env.GEMINI_API_KEY || process.env.ANTHROPIC_API_KEY);
 }
