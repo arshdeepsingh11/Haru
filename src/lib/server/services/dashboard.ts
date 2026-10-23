@@ -14,6 +14,7 @@ import { listOpportunities } from "./opportunities";
 import { upcomingReminders } from "./reminders";
 import { listObservations } from "./observations";
 import { periodContaining, payDateFor } from "../../domain/payroll";
+import { getCoach, type CoachData } from "./coach";
 
 export interface AttentionItem {
   id: string;
@@ -56,6 +57,7 @@ export interface DashboardData {
   order: ComponentKey[];
   layout: LayoutEntry[];
   isEmpty: boolean;
+  coach: CoachData;
 }
 
 export async function getDashboard(ctx: Ctx): Promise<DashboardData> {
@@ -63,7 +65,7 @@ export async function getDashboard(ctx: Ctx): Promise<DashboardData> {
   const monthStart = startOfMonth(ctx.today);
   const chartStart = addDays(weekStart, -7 * 7);
 
-  const [jobs, accounts, bills, forecasts, awaiting, opps, reminders, observations] = await Promise.all([
+  const [jobs, accounts, bills, forecasts, awaiting, opps, reminders, observations, coach] = await Promise.all([
     listJobs(ctx),
     listAccounts(ctx),
     listBills(ctx),
@@ -72,6 +74,7 @@ export async function getDashboard(ctx: Ctx): Promise<DashboardData> {
     listOpportunities(ctx, sql, { active: true }),
     upcomingReminders(ctx),
     listObservations(ctx),
+    getCoach(ctx),
   ]);
 
   const [earnRows, oppEarn, spendRows, catRows, upcoming, unpaidShifts, missedShifts, goals, debts, activity, layoutRow, unread] = await Promise.all([
@@ -296,5 +299,6 @@ export async function getDashboard(ctx: Ctx): Promise<DashboardData> {
     order: arrange(scores, layout),
     layout,
     isEmpty: jobs.length === 0 && accounts.length === 0 && bills.length === 0 && goals.length === 0 && debts.length === 0 && opps.length === 0,
+    coach,
   };
 }

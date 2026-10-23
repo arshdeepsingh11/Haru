@@ -1,7 +1,7 @@
 import "server-only";
 import { sql } from "../db";
 import type { Ctx } from "../context";
-import { observeDeclineThreshold, observeLoggingTime, observePostPaydaySaving, type Observation } from "../../domain/observations";
+import { observeDeclineThreshold, observeLoggingTime, observeMissedWeekday, observePostPaydaySaving, type Observation } from "../../domain/observations";
 
 export interface ObservationRow extends Observation {
   id: string;
@@ -10,7 +10,7 @@ export interface ObservationRow extends Observation {
 
 /** Recompute evidence-based observations. Dismissed ones are never resurrected. */
 export async function refreshObservations(ctx: Ctx) {
-  const [opps, shifts, paychecks, contributions] = await Promise.all([
+  const [opps, shifts, paychecks, contributions, recent] = await Promise.all([
     sql<{ status: string; offered_cents: number; expected_minutes: number | null }[]>`
       select status, offered_cents, expected_minutes from work_opportunities where user_id = ${ctx.userId}`,
     sql<{ status: string; source: string; work_date: string; created_at: Date }[]>`
@@ -21,11 +21,15 @@ export async function refreshObservations(ctx: Ctx) {
     sql<{ contributed_on: string; amount_cents: number }[]>`
       select contributed_on, amount_cents from goal_contributions where user_id = ${ctx.userId} and voided_at is null
       order by contributed_on desc limit 40`,
+    sql<{ status: string; weekday: number }[]>`
+      select status, extract(dow from work_date)::int as weekday from shifts
+      where user_id = ${ctx.userId} and status in ('completed','missed') and work_date >= current_date - 56`,
   ]);
   const found = [
     observeDeclineThreshold(opps, ctx.currency),
     observeLoggingTime(shifts, ctx.tz, ctx.prefs.log_hours_time),
     observePostPaydaySaving(paychecks, contributions, ctx.currency),
+    observeMissedWeekday(recent),
   ].filter((o): o is Observation => o != null);
 
   for (const o of found) {

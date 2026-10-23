@@ -92,3 +92,24 @@ export function observePostPaydaySaving(
     evidence: { matched: matched.length, received: received.length, typicalCents: typical },
   };
 }
+
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+/** "You've missed 3 of your last 4 Saturday shifts." Needs at least 3 misses on one weekday. */
+export function observeMissedWeekday(shifts: { status: string; weekday: number }[]): Observation | null {
+  let best: { day: number; missed: number; total: number } | null = null;
+  for (let d = 0; d < 7; d++) {
+    const onDay = shifts.filter((s) => s.weekday === d && (s.status === "completed" || s.status === "missed"));
+    const missed = onDay.filter((s) => s.status === "missed").length;
+    if (missed >= 3 && missed / onDay.length >= 0.5 && (!best || missed / onDay.length > best.missed / best.total)) best = { day: d, missed, total: onDay.length };
+  }
+  if (!best) return null;
+  const name = DAY_NAMES[best.day];
+  return {
+    kind: "missed_weekday",
+    statement: `${name} shifts are the ones you miss most. A reminder the night before might help.`,
+    basis: `${best.missed} of your last ${best.total} ${name} shifts were missed.`,
+    confidence: best.total >= 6 ? "observed" : "hypothesis",
+    evidence: { weekday: best.day, missed: best.missed, total: best.total },
+  };
+}
