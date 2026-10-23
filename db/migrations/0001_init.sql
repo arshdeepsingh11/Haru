@@ -78,3 +78,21 @@ create table job_wages (
   unique (job_id, effective_from)
 );
 create index job_wages_job_idx on job_wages(job_id, effective_from desc);
+
+-- ---------------------------------------------------------------------------
+-- Money: accounts & ledger
+-- ---------------------------------------------------------------------------
+create table accounts (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references app_users(id) on delete cascade,
+  name text not null check (length(name) between 1 and 80),
+  kind text not null default 'checking' check (kind in ('checking','savings','cash','other')),
+  opening_balance_cents bigint not null default 0,
+  opening_date date not null default current_date,
+  is_manual boolean not null default true,   -- true until a real bank sync exists (none is built)
+  balance_confirmed boolean not null default false, -- false until the user states a real balance
+  archived_at timestamptz,
+  created_at timestamptz not null default now(),
+  unique (id, user_id)
+);
+create index accounts_user_idx on accounts(user_id);
