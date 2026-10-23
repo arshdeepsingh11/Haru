@@ -1,8 +1,9 @@
 import "server-only";
 import { ASSET_MAP, type Asset } from "../../invest/catalog";
 import { combineSeries, sliceRange, type Candle, type Range } from "../../invest/analytics";
-import { cached, peek } from "./cache";
-import { avDaily, bocSeries, eodDaily, eodQuote, keys, mfHistory, ProviderError, tdQuote, tdSeries, type RawQuote } from "./providers";
+import { cached, cacheGet, cacheSet, peek } from "./cache";
+import { avDaily, bocSeries, eodDaily, eodQuote, keys, mfHistory, nseBhavLatest, nseIndexLatest, parseStamp, ProviderError, tdQuote, tdSeries, type RawQuote } from "./providers";
+import type { DayBar } from "../../invest/nse-parse";
 
 // Prices and history for any asset: picks the best source available, caches, and says how fresh it is.
 
@@ -28,7 +29,40 @@ export type QuoteResult = Quote | Unavailable;
 export const isQuote = (q: QuoteResult | null | undefined): q is Quote => !!q && "price" in q;
 
 const H = 3600e3;
-const TTL = { quote: 60e3, daily: 6 * H, avDaily: 12 * H, boc: 6 * H, mf: 12 * H, intraday: 5 * 60e3 };
+const TTL = { quote: 60e3, daily: 6 * H, avDaily: 20 * H, boc: 6 * H, mf: 12 * H, intraday: 5 * 60e3, nse: 2 * H, notCovered: 24 * H };
+
+// A provider that said "not on your plan" for an asset isn't asked again for a day:
+// free plans have tiny budgets, and every wasted call makes the page slower.
+const ncKey = (provider: string, assetKey: string) => `nc:${provider}:${assetKey}`;
+async function notCovered(provider: string, assetKey: string): Promise<boolean> {
+  const e = await cacheGet<boolean>(ncKey(provider, assetKey));
+  return !!e && e.expiresAt > Date.now();
+}
+async function markIfNotCovered(provider: string, assetKey: string, e: unknown) {
+  if (e instanceof ProviderError && e.kind === "not_covered") await cacheSet(ncKey(provider, assetKey), true, TTL.notCovered).catch(() => {});
+}
+
+// NSE's official daily files: one download covers every Indian stock, ETF and index.
+const inflight = new Map<string, Promise<unknown>>();
+function once<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  const cur = inflight.get(key) as Promise<T> | undefined;
+  if (cur) return cur;
+  const p = fn().finally(() => inflight.delete(key));
+  inflight.set(key, p);
+  return p;
+}
+async function nseBar(a: Asset): Promise<DayBar | null> {
+  const s = a.symbols;
+  if (s.nse) {
+    const r = await once("nse:eq", () => cached("nse:eq", TTL.nse, () => nseBhavLatest()));
+    return r.data.bars[s.nse.toUpperCase()] ?? null;
+  }
+  if (s.nseIndex) {
+    const r = await once("nse:idx", () => cached("nse:idx", TTL.nse, () => nseIndexLatest()));
+    return r.data.bars[s.nseIndex.toLowerCase()] ?? null;
+  }
+  return null;
+}
 const yearsAgo = (n: number) => new Date(Date.now() - n * 365.25 * 86400e3).toISOString().slice(0, 10);
 
 interface Daily {
@@ -67,13 +101,13 @@ async function loadDaily(a: Asset, opts: { long?: boolean } = {}): Promise<Daily
     const c = await attempt(() => eodDaily(s.eod!, yearsAgo(opts.long ? 30 : 6)));
     if (c?.length) return { candles: c, source: "EODHD", freshness: "eod" };
   }
-  if (s.td && keys.td()) {
-    const c = await attempt(() => tdSeries(s.td!, s.tdExchange, "1day", opts.long ? 5000 : 1600));
+  if (s.td && keys.td() && !(await notCovered("td", a.key))) {
+    const c = await attempt(() => tdSeries(s.td!, s.tdExchange, "1day", opts.long ? 5000 : 1600).catch(async (e) => (await markIfNotCovered("td", a.key, e), Promise.reject(e))));
     if (c?.length) return { candles: c, source: "Twelve Data", freshness: "eod" };
   }
-  if (s.av && keys.av()) {
-    const c = await attempt(() => avDaily(s.av!, !!opts.long));
-    if (c?.length) return { candles: c, source: "Alpha Vantage", freshness: "eod" };
+  if (s.av && keys.av() && !(await notCovered("av", a.key))) {
+    const c = await attempt(() => avDaily(s.av!, !!opts.long).catch(async (e) => (await markIfNotCovered("av", a.key, e), Promise.reject(e))));
+    if (c?.length) return { candles: withTodayFromNse(c, await nseBar(a).catch(() => null)), source: "Alpha Vantage", freshness: "eod" };
   }
   if (s.boc) {
     const c = await attempt(() => bocSeries(s.boc!, yearsAgo(opts.long ? 20 : 6)));
@@ -87,7 +121,21 @@ async function loadDaily(a: Asset, opts: { long?: boolean } = {}): Promise<Daily
     const m = await attempt(() => mfHistory(s.mf!));
     if (m) return { candles: m.candles, source: "AMFI via mfapi.in", freshness: "official" };
   }
+  if (s.nse || s.nseIndex) {
+    // No history source: at least the latest official day, so the price and day range are right.
+    const b = await attempt(() => nseBar(a));
+    if (b) return { candles: [{ t: parseStamp(b.date), o: b.o, h: b.h, l: b.l, c: b.c }], source: "NSE", freshness: "eod" };
+  }
   throw new ProviderError("HARU", errors.length ? errors.join("; ") : "no data source configured for this asset", errors.length ? "failed" : "no_key");
+}
+
+/** Alpha Vantage (BSE) history can lag a day: add NSE's latest official close when it is newer. */
+function withTodayFromNse(c: Candle[], b: DayBar | null): Candle[] {
+  if (!b || !c.length) return c;
+  const t = parseStamp(b.date);
+  const last = c[c.length - 1];
+  if (new Date(last.t).toISOString().slice(0, 10) >= b.date) return c;
+  return [...c, { t, o: b.o, h: b.h, l: b.l, c: b.c }];
 }
 
 export async function getDaily(a: Asset, opts: { long?: boolean } = {}): Promise<Daily> {
@@ -167,10 +215,15 @@ async function loadQuote(a: Asset): Promise<Quote> {
       /* fall through */
     }
   }
-  if (s.td && keys.td()) {
+  if (s.nse || s.nseIndex) {
+    const b = await nseBar(a).catch(() => null);
+    if (b) return finish(a, { price: b.c, prevClose: b.prev, asOf: parseStamp(b.date), source: "NSE (official close)", freshness: "eod" }, false);
+  }
+  if (s.td && keys.td() && !(await notCovered("td", a.key))) {
     try {
       return finish(a, await tdQuote(s.td, s.tdExchange), false);
-    } catch {
+    } catch (e) {
+      await markIfNotCovered("td", a.key, e);
       /* fall through to end-of-day */
     }
   }
@@ -179,14 +232,14 @@ async function loadQuote(a: Asset): Promise<Quote> {
 }
 
 export async function getQuote(a: Asset): Promise<QuoteResult> {
-  if (!a.derived && !needsFor(a).length && !a.symbols.boc && !a.symbols.bocRatio && !a.symbols.mf) return { key: a.key, unavailable: "No live price for this" };
+  if (!a.derived && !needsFor(a).length && !a.symbols.boc && !a.symbols.bocRatio && !a.symbols.mf && !a.symbols.nse && !a.symbols.nseIndex) return { key: a.key, unavailable: "No live price for this" };
   try {
     const live = !!(a.symbols.td && keys.td()) || !!(a.symbols.eod && keys.eod());
     const r = await cached(`q:${a.key}`, live ? TTL.quote : 30 * 60e3, () => loadQuote(a));
     return { ...r.data, stale: r.stale || r.data.stale };
   } catch (e) {
     const missing = !keys.td() && !keys.av() && !keys.eod();
-    return { key: a.key, unavailable: missing && !a.symbols.boc && !a.symbols.bocRatio ? "Connect a market data key to see this price" : e instanceof ProviderError ? friendly(e) : "Price unavailable right now", needs: needsFor(a) };
+    return { key: a.key, unavailable: missing && !a.symbols.boc && !a.symbols.bocRatio && !a.symbols.nse && !a.symbols.nseIndex ? "Connect a market data key to see this price" : e instanceof ProviderError ? friendly(e) : "Price unavailable right now", needs: needsFor(a) };
   }
 }
 

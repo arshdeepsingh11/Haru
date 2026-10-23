@@ -1,11 +1,12 @@
 import "server-only";
 import type { Candle } from "../../invest/analytics";
 import { takeBudget } from "./cache";
+import { parseBhav, parseIndexCloses, recentIstDates, unzipFirst, type DayBar } from "../../invest/nse-parse";
 
 // Thin clients for each data source. Each returns clean candles/quotes or throws ProviderError.
 // Sources: Twelve Data (live US, FX, crypto, metals), Alpha Vantage (end-of-day BSE/TSX),
 // EODHD (optional: live-delayed NSE/TSX + indexes), Bank of Canada Valet (official rates and FX, no key),
-// mfapi.in (India mutual fund NAVs, from AMFI).
+// mfapi.in (India mutual fund NAVs, from AMFI), NSE's official daily price files (every Indian stock, no key).
 
 export class ProviderError extends Error {
   constructor(
@@ -164,6 +165,41 @@ export async function mfHistory(code: string): Promise<{ name: string; house: st
 export async function mfSearch(q: string): Promise<{ code: string; name: string }[]> {
   const j = (await getJson("mfapi.in", `https://api.mfapi.in/mf/search?q=${encodeURIComponent(q)}`)) as { schemeCode: number; schemeName: string }[];
   return (Array.isArray(j) ? j : []).slice(0, 25).map((x) => ({ code: String(x.schemeCode), name: x.schemeName }));
+}
+
+// ------------------------------------------------------------------ NSE (official daily files, free, no key)
+const NSE_HEADERS = { "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130 Safari/537.36", accept: "*/*", referer: "https://www.nseindia.com/" };
+
+async function nseGet(url: string): Promise<Response | null> {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(12_000), headers: NSE_HEADERS, cache: "no-store" });
+    return res.ok ? res : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The latest NSE bhavcopy (every stock and ETF, one trading day). Tries today and earlier days, newest first. */
+export async function nseBhavLatest(now = Date.now()): Promise<{ date: string; bars: Record<string, DayBar> }> {
+  for (const d of recentIstDates(now, 8)) {
+    const res = await nseGet(`https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_${d.replace(/-/g, "")}_F_0000.csv.zip`);
+    if (!res) continue;
+    const bars = parseBhav(unzipFirst(new Uint8Array(await res.arrayBuffer())));
+    if (Object.keys(bars).length > 100) return { date: d, bars };
+  }
+  throw new ProviderError("NSE", "no recent NSE price file reachable", "failed");
+}
+
+/** The latest NSE index closes (Nifty 50, Nifty Bank, …). */
+export async function nseIndexLatest(now = Date.now()): Promise<{ date: string; bars: Record<string, DayBar> }> {
+  for (const d of recentIstDates(now, 8)) {
+    const [y, m, dd] = d.split("-");
+    const res = await nseGet(`https://nsearchives.nseindia.com/content/indices/ind_close_all_${dd}${m}${y}.csv`);
+    if (!res) continue;
+    const bars = parseIndexCloses(await res.text());
+    if (Object.keys(bars).length > 5) return { date: d, bars };
+  }
+  throw new ProviderError("NSE", "no recent NSE index file reachable", "failed");
 }
 
 // ------------------------------------------------------------------ feeds

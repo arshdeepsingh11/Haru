@@ -12,6 +12,8 @@ export interface ProviderSymbols {
   eod?: string; // EODHD, e.g. "RELIANCE.NSE", "RY.TO", "NSEI.INDX"
   boc?: string; // Bank of Canada Valet series, e.g. "V39079"
   mf?: string; // mfapi.in scheme code (India mutual funds)
+  nse?: string; // NSE symbol in the official daily bhavcopy, e.g. "RELIANCE"
+  nseIndex?: string; // NSE index name in the official daily index file, lower case, e.g. "nifty 50"
   /** Official cross rate from two Bank of Canada series: value = first ÷ second (e.g. USD/INR = USDCAD ÷ INRCAD). */
   bocRatio?: [string, string];
 }
@@ -66,7 +68,8 @@ const stockIN = (code: string, name: string, words: string[] = []): Asset => ({
   country: "IN",
   kind: "stock",
   currency: "INR",
-  symbols: { av: `${code}.BSE`, eod: `${code}.NSE`, td: code, tdExchange: "NSE" },
+  // NSE's official daily file first (free, every stock); Alpha Vantage (BSE) for long history; EODHD if paid.
+  symbols: { nse: code, av: `${code}.BSE`, eod: `${code}.NSE` },
   words: [name.toLowerCase(), code.toLowerCase(), ...words],
 });
 const etfIN = (code: string, name: string, words: string[] = []): Asset => ({ ...stockIN(code, name, words), key: `IN:etf:${code}`, kind: "etf" });
@@ -127,7 +130,8 @@ export const ASSETS: Asset[] = [
   us("GLD", "SPDR Gold Shares", "etf", ["gold etf"]),
 
   // ---------- India
-  { key: "IN:index:NIFTY", name: "Nifty 50", short: "NIFTY", country: "IN", kind: "index", currency: "INR", symbols: { eod: "NSEI.INDX" }, words: ["nifty", "निफ्टी"] },
+  { key: "IN:index:NIFTY", name: "Nifty 50", short: "NIFTY", country: "IN", kind: "index", currency: "INR", symbols: { nseIndex: "nifty 50", eod: "NSEI.INDX" }, words: ["nifty", "निफ्टी"] },
+  { key: "IN:index:BANKNIFTY", name: "Nifty Bank", short: "BANKNIFTY", country: "IN", kind: "index", currency: "INR", symbols: { nseIndex: "nifty bank", eod: "NSEBANK.INDX" }, words: ["bank nifty", "nifty bank"] },
   { key: "IN:index:SENSEX", name: "Sensex", short: "SENSEX", country: "IN", kind: "index", currency: "INR", symbols: { eod: "BSESN.INDX" }, words: ["sensex", "सेंसेक्स"] },
   stockIN("RELIANCE", "Reliance Industries", ["reliance", "ambani", "jio"]),
   stockIN("TCS", "Tata Consultancy Services", ["tcs"]),
@@ -138,7 +142,7 @@ export const ASSETS: Asset[] = [
   stockIN("BHARTIARTL", "Bharti Airtel", ["airtel"]),
   stockIN("ITC", "ITC"),
   stockIN("LT", "Larsen & Toubro", ["l&t"]),
-  stockIN("TATAMOTORS", "Tata Motors"),
+  stockIN("TMPV", "Tata Motors Passenger Vehicles", ["tata motors"]),
   etfIN("NIFTYBEES", "Nippon Nifty 50 BeES", ["nifty etf"]),
   etfIN("GOLDBEES", "Nippon Gold BeES", ["gold etf"]),
   etfIN("BANKBEES", "Nippon Bank BeES"),
@@ -234,10 +238,10 @@ export const COUNTRIES: Country[] = [
     name: "India",
     flag: "🇮🇳",
     currency: "INR",
-    pulse: ["IN:index:NIFTY", "IN:index:SENSEX", "IN:metal:GOLD10G", "IN:fx:USDINR", "IN:fx:CADINR"],
+    pulse: ["IN:index:NIFTY", "IN:index:BANKNIFTY", "IN:metal:GOLD10G", "IN:fx:USDINR", "IN:fx:CADINR"],
     words: ["india", "indian", "sensex", "nifty", "rbi", "rupee", "mumbai", "delhi", "bengaluru", "nse", "bse", "sebi", "भारत", "भारतीय", "मुंबई", "दिल्ली"],
     interests: [
-      { key: "stocks", label: "Stocks", assets: ["IN:stock:RELIANCE", "IN:stock:TCS", "IN:stock:HDFCBANK", "IN:stock:INFY", "IN:stock:ICICIBANK", "IN:stock:SBIN", "IN:stock:BHARTIARTL", "IN:stock:ITC", "IN:stock:LT", "IN:stock:TATAMOTORS"], words: W.stocks },
+      { key: "stocks", label: "Stocks", assets: ["IN:stock:RELIANCE", "IN:stock:TCS", "IN:stock:HDFCBANK", "IN:stock:INFY", "IN:stock:ICICIBANK", "IN:stock:SBIN", "IN:stock:BHARTIARTL", "IN:stock:ITC", "IN:stock:LT", "IN:stock:TMPV"], words: W.stocks },
       { key: "etf", label: "ETFs", assets: ["IN:etf:NIFTYBEES", "IN:etf:GOLDBEES", "IN:etf:BANKBEES", "IN:etf:JUNIORBEES"], words: W.etf },
       { key: "mutual_funds", label: "Mutual funds", assets: [], note: "Search any fund by name to see its NAV history (AMFI data).", words: W.funds },
       { key: "gold", label: "Gold", assets: ["IN:metal:GOLD10G", "IN:etf:GOLDBEES"], note: "Spot price from world gold and USD/INR. Jeweller rates add GST, making charges and local premiums.", words: W.gold },
