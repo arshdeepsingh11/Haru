@@ -116,7 +116,7 @@ days closer = shift take-home ÷ (monthly surplus ÷ 30.44)
 - **Haru checks its own work.** Every saved job comes back with the computed next payday ("Next payday Fri, Oct 30, for work Oct 16 to Oct 30"), so a wrong date is caught and fixed straight away. It can't save a pay calendar it hasn't been told: a twice-a-month job without pay days is refused, and Haru asks instead.
 - **Haru knows the date.** A calendar from last week to three weeks ahead, with paydays and bills marked, is in every turn, so "this Friday" and "next paycheck" are always right.
 - **You see it working.** Each step streams to the chat as it happens ("Saving your job ✓", "Adding Rent ✓"), and big messages are saved in one go.
-- **Busy servers don't stall you.** If Gemini is overloaded (503) or out of quota (429), Haru retries and then falls back through `gemini-3.8-flash → 3.6-flash → 3.5-flash-lite → 2.5-flash`, re-signing tool-call history so the switch is safe. If every model is busy, nothing is stored and you get a **Retry** button.
+- **Busy servers don't stall you.** If Gemini is overloaded (503) or out of quota (429), Haru retries and then falls back through `gemini-3.8-flash → 3.6-flash → 2.5-flash`, re-signing tool-call history so the switch is safe. If every model is busy, nothing is stored and you get a **Retry** button.
 
 ## Under the hood
 

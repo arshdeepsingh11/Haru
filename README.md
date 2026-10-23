@@ -129,7 +129,7 @@ Reminder categories and timing (minutes before shifts, the time to nudge you to 
 | `NEXT_PUBLIC_SUPABASE_URL` | yes | Public. |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | yes | Public by design; it cannot read HARU's tables (see RLS above). |
 | `GEMINI_API_KEY` | for the AI (free) | Server only. Preferred when set. |
-| `HARU_AI_FALLBACK_MODELS` | optional | Comma-separated Gemini models tried when the main one is busy. Default: `gemini-3.6-flash,gemini-3.5-flash-lite,gemini-2.5-flash`. Empty string disables fallback. |
+| `HARU_AI_FALLBACK_MODELS` | optional | Comma-separated Gemini models tried when the main one is busy. Default: `gemini-3.6-flash,gemini-2.5-flash` (flash-lite is left out: it drops details). Empty string disables fallback. |
 | `ANTHROPIC_API_KEY` | for the AI | Server only. |
 | `HARU_AI_MODEL` | no | Default `claude-sonnet-5-5`. |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | for push | Public. |
