@@ -188,3 +188,22 @@ create table debts (
   created_at timestamptz not null default now(),
   unique (id, user_id)
 );
+
+create table bills (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references app_users(id) on delete cascade,
+  name text not null check (length(name) between 1 and 120),
+  amount_cents bigint not null check (amount_cents > 0),
+  next_due_date date not null,
+  due_anchor_day smallint check (due_anchor_day between 1 and 31), -- keeps "the 31st" from drifting
+  recurrence text not null default 'none' check (recurrence in ('none','weekly','biweekly','monthly','yearly')),
+  category text not null default 'bills',
+  account_id uuid,
+  status text not null default 'active' check (status in ('active','paid','archived')),
+  notes text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  foreign key (account_id, user_id) references accounts(id, user_id) on delete set null (account_id),
+  unique (id, user_id)
+);
+create index bills_user_due_idx on bills(user_id, status, next_due_date);
