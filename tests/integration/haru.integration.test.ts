@@ -542,6 +542,25 @@ test("Haru gets pay calendars right, reads them back, and remembers corrections"
   assert.equal(fix.assistant.actions[0].status, "completed");
   await memorySvc.remember(c, ["Sends 2,000 CAD to family in India every month from the BioARO paycheck on the 15th."]);
   assert.equal((await memorySvc.listMemory(c)).length, 1);
+
+  // Jobs saved with real paydays are confirmed; a guessed one asks once on the dashboard.
+  assert.ok((await jobs.listJobs(c)).every((j) => j.pay_confirmed_at), "explicit paydays are confirmed");
+  const cafe = await jobs.createJob(c, { employer: "Cafe", hourly_rate: 17 }, "user");
+  let d = await dash.getDashboard(c);
+  const ask = d.attention.find((x) => x.confirmPay?.jobId === cafe.data!.id);
+  assert.ok(ask, "unconfirmed job shows a check-your-paydays card");
+  await jobs.updateJob(c, { job_id: cafe.data!.id, pay_frequency: "weekly", payday_weekday: 5 }, "user");
+  d = await dash.getDashboard(c);
+  assert.ok(!d.attention.some((x) => x.confirmPay?.jobId === cafe.data!.id), "setting paydays confirms them");
+
+  // Changing the usual week replaces upcoming generated shifts (untouched ones only).
+  await shifts.materializeSchedules(c, 14);
+  const before = await sql<{ n: number }[]>`select count(*)::int as n from shifts where job_id = ${bioJob.id} and source = 'schedule' and starts_at > now()`;
+  assert.ok(before[0].n > 0);
+  await jobs.updateJob(c, { job_id: bioJob.id, regular_schedule: [{ weekday: 6, start: "10:00", end: "14:00" }] }, "user");
+  await shifts.materializeSchedules(c, 14);
+  const wd = await sql<{ d: number }[]>`select distinct extract(dow from work_date)::int as d from shifts where job_id = ${bioJob.id} and source = 'schedule' and starts_at > now()`;
+  assert.deepEqual(wd.map((r) => r.d), [6], "only the new pattern remains");
   await sql`delete from app_users where id = ${C}`;
 });
 
