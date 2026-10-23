@@ -450,3 +450,11 @@ from accounts a
 left join transactions t
   on (t.account_id = a.id or t.to_account_id = a.id) and t.user_id = a.user_id
 group by a.id;
+
+create view debt_balances as
+select d.id as debt_id, d.user_id, d.name, d.status, d.starting_balance_cents,
+  coalesce(sum(t.amount_cents) filter (where t.voided_at is null), 0) as paid_cents,
+  greatest(d.starting_balance_cents - coalesce(sum(t.amount_cents) filter (where t.voided_at is null), 0), 0) as balance_cents
+from debts d
+left join transactions t on t.debt_id = d.id and t.type = 'debt_payment' and t.user_id = d.user_id
+group by d.id;
