@@ -323,3 +323,39 @@ test("dashboard cards: placed in natural order without disturbing the user's ord
   assert.deepEqual(normalizeCards({ show: ["week", "nope", "week"], removed: "x" }), { show: ["week"], removed: [] });
   assert.equal(normalizeCards(null), null);
 });
+
+test("pay calendar: 'paid on the 15th and 30th' means each paycheck covers work since the last payday", async () => {
+  const { periodWithPayDate, nextPayPeriod } = await import("../src/lib/domain/payroll");
+  const rule = { frequency: "semimonthly" as const, payDays: [15, 30], paydayOffsetDays: 0, weekendRule: "none" as const };
+  assert.deepEqual(periodWithPayDate(rule, "2026-10-23"), { start: "2026-10-16", end: "2026-10-30", payDate: "2026-10-30" });
+  assert.deepEqual(periodWithPayDate(rule, "2026-10-31"), { start: "2026-10-31", end: "2026-11-15", payDate: "2026-11-15" });
+  assert.deepEqual(periodWithPayDate(rule, "2027-02-20"), { start: "2027-02-16", end: "2027-02-28", payDate: "2027-02-28" }, "30th clamps to Feb 28");
+  assert.equal(nextPayPeriod(rule, "2026-10-23").payDate, "2026-10-30", "never Nov 3");
+  assert.equal(nextPayPeriod(rule, "2026-10-30").payDate, "2026-10-30", "payday itself is today");
+  const monthly = { frequency: "monthly" as const, payDays: [1], paydayOffsetDays: 0, weekendRule: "none" as const };
+  assert.deepEqual(periodWithPayDate(monthly, "2026-10-23"), { start: "2026-10-02", end: "2026-11-01", payDate: "2026-11-01" });
+});
+
+test("pay calendar: weekly 'paid every Friday' from a next payday", async () => {
+  const { anchorFromNextPayday, nextWeekday, nextPayPeriod } = await import("../src/lib/domain/payroll");
+  assert.equal(nextWeekday("2026-10-23", 5), "2026-10-23", "today is Friday");
+  assert.equal(nextWeekday("2026-10-24", 5), "2026-10-30");
+  const anchor = anchorFromNextPayday("weekly", "2026-10-23", 6);
+  const rule = { frequency: "weekly" as const, anchorDate: anchor, paydayOffsetDays: 6, weekendRule: "none" as const };
+  assert.equal(nextPayPeriod(rule, "2026-10-23").payDate, "2026-10-23", "paid today");
+  assert.equal(nextPayPeriod(rule, "2026-10-24").payDate, "2026-10-30", "then every Friday");
+  const p = nextPayPeriod(rule, "2026-10-24");
+  assert.deepEqual([p.start, p.end], ["2026-10-18", "2026-10-24"], "the week ending the Saturday before");
+});
+
+test("Haru's job tool refuses to guess a pay calendar", async () => {
+  const { TOOL_MAP } = await import("../src/lib/ai/tools");
+  const create = TOOL_MAP.get("create_job")!;
+  const bad = create.schema.safeParse({ employer: "BioARO", hourly_rate: 18, pay_frequency: "semimonthly" });
+  assert.equal(bad.success, false);
+  assert.match(JSON.stringify(bad.error?.issues), /pay_days/);
+  assert.equal(create.schema.safeParse({ employer: "Amazon", hourly_rate: 25.6, pay_frequency: "weekly" }).success, false);
+  assert.equal(create.schema.safeParse({ employer: "Amazon", hourly_rate: 25.6, pay_frequency: "weekly", payday_weekday: 5 }).success, true);
+  assert.equal(create.schema.safeParse({ employer: "BioARO", hourly_rate: 18, pay_frequency: "semimonthly", pay_days: [15, 30] }).success, true);
+  assert.equal(create.schema.safeParse({ employer: "Cafe", hourly_rate: 17 }).success, true, "pay calendar can come later");
+});

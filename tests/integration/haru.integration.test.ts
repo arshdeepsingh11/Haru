@@ -29,6 +29,8 @@ const agent = await import("../../src/lib/ai/agent");
 const loop = await import("../../src/lib/server/services/shiftloop");
 const coach = await import("../../src/lib/server/services/coach");
 const cardsSvc = await import("../../src/lib/server/services/cards");
+const memorySvc = await import("../../src/lib/server/services/memory");
+const payrollDomain = await import("../../src/lib/domain/payroll");
 const { AppError } = await import("../../src/lib/server/errors");
 const { addDays, weekdayOf } = await import("../../src/lib/domain/time");
 import type { ChatProvider, ChatResponse } from "../../src/lib/ai/provider";
@@ -489,6 +491,58 @@ test("notifications: shift reminder carries earnings and buttons; can't-go cance
   const [after] = await sql<{ n: number }[]>`select count(*)::int as n from reminders where user_id = ${c.userId} and category = 'checkout' and status = 'pending'`;
   assert.equal(after.n, 0);
   await sql`delete from app_users where id = ${c.userId}`;
+});
+
+test("Haru gets pay calendars right, reads them back, and remembers corrections", { skip }, async () => {
+  const C = randomUUID();
+  await sql`insert into app_users (id, email) values (${C}, ${`${C}@test.local`})`;
+  await sql`insert into user_preferences (user_id) values (${C})`;
+  const c = await ctxForUser(C);
+  // One long message → many tool calls in one step.
+  const t = await agent.runTurn(c, { text: "BioARO $18/h paid 15th and 30th Mon–Fri 8:30–17:00, Amazon $25.60 paid every Friday Sun 18–22 and 23:30–03:30" }, {
+    provider: scripted([
+      () => ({
+        content: [
+          { type: "tool_call", id: "a", name: "create_job", input: { employer: "BioARO", hourly_rate: 18, pay_frequency: "semimonthly", pay_days: [15, 30], regular_schedule: [1, 2, 3, 4, 5].map((weekday) => ({ weekday, start: "08:30", end: "17:00", break_minutes: 30 })) } },
+          { type: "tool_call", id: "b", name: "create_job", input: { employer: "Amazon", hourly_rate: 25.6, pay_frequency: "weekly", payday_weekday: 5, regular_schedule: [{ weekday: 0, start: "18:00", end: "22:00" }, { weekday: 0, start: "23:30", end: "03:30" }] } },
+          { type: "tool_call", id: "c", name: "remember", input: { facts: ["Sends 2,000 CAD to family in India every month from the BioARO paycheck on the 15th."] } },
+        ],
+        stopReason: "tool_use",
+      }),
+      () => say("Saved both jobs."),
+    ]),
+  });
+  assert.equal(t.assistant.actions.length, 3);
+  assert.ok(t.assistant.actions.every((a) => a.status === "completed"), JSON.stringify(t.assistant.actions.map((a) => a.error)));
+  const bio = t.assistant.actions[0].summary!;
+  const expectedBio = payrollDomain.nextPayPeriod({ frequency: "semimonthly", payDays: [15, 30], paydayOffsetDays: 0, weekendRule: "none" }, c.today).payDate;
+  assert.match(bio, /Next payday/);
+  assert.ok(bio.includes(String(Number(expectedBio.slice(8)))), `read-back shows the real payday ${expectedBio}: ${bio}`);
+  const amazonPay = payrollDomain.nextWeekday(c.today, 5);
+  const jobsNow = await jobs.listJobs(c);
+  const amazon = jobsNow.find((j) => j.employer === "Amazon")!;
+  assert.equal(payrollDomain.nextPayPeriod(jobs.payRuleOf(amazon)!, c.today).payDate, amazonPay, "Amazon pays on Fridays");
+  assert.equal(amazon.regular_schedule.filter((e) => e.weekday === 0).length, 2, "two shifts on Sunday");
+
+  // Memory shows up in the next turn's instructions.
+  assert.equal((await memorySvc.listMemory(c)).length, 1);
+  const { buildSystemPrompt } = await import("../../src/lib/ai/prompt");
+  const prompt = await buildSystemPrompt(c);
+  assert.match(prompt, /2,000 CAD to family in India/);
+  assert.match(prompt, /payday BioARO/, "paydays are marked on the calendar");
+
+  // Guessing is refused: semimonthly without pay days fails validation, nothing saved.
+  const g = await agent.runTurn(c, { text: "add Cafe paid twice a month" }, { provider: scripted([() => call("create_job", { employer: "Cafe", hourly_rate: 17, pay_frequency: "semimonthly" }), () => say("Which days?")]) });
+  assert.equal(g.assistant.actions.length, 0);
+  assert.equal((await jobs.listJobs(c)).length, 2);
+
+  // A correction is applied without a confirmation step, and remembered facts don't duplicate.
+  const bioJob = jobsNow.find((j) => j.employer === "BioARO")!;
+  const fix = await agent.runTurn(c, { text: "BioARO pays on the 15th and last day" }, { provider: scripted([() => call("update_job", { job_id: bioJob.id, pay_days: [15, 31] }), () => say("Fixed.")]) });
+  assert.equal(fix.assistant.actions[0].status, "completed");
+  await memorySvc.remember(c, ["Sends 2,000 CAD to family in India every month from the BioARO paycheck on the 15th."]);
+  assert.equal((await memorySvc.listMemory(c)).length, 1);
+  await sql`delete from app_users where id = ${C}`;
 });
 
 test("AI-built dashboard: starts empty, grows as Haru saves things, remembers removals, setup completes", { skip }, async () => {
