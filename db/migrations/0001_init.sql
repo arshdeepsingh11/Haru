@@ -207,3 +207,40 @@ create table bills (
   unique (id, user_id)
 );
 create index bills_user_due_idx on bills(user_id, status, next_due_date);
+
+create table transactions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null,
+  account_id uuid not null,
+  type text not null check (type in ('income','expense','transfer','paycheck','debt_payment','adjustment')),
+  amount_cents bigint not null check (amount_cents <> 0),
+  occurred_on date not null,
+  category text,
+  description text,
+  to_account_id uuid,
+  paycheck_id uuid,
+  opportunity_id uuid,
+  bill_id uuid,
+  debt_id uuid,
+  source text not null default 'manual' check (source in ('manual','ai','system')),
+  voided_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  foreign key (account_id, user_id) references accounts(id, user_id) on delete cascade,
+  foreign key (to_account_id, user_id) references accounts(id, user_id),
+  foreign key (paycheck_id, user_id) references paychecks(id, user_id),
+  foreign key (opportunity_id, user_id) references work_opportunities(id, user_id),
+  foreign key (bill_id, user_id) references bills(id, user_id),
+  foreign key (debt_id, user_id) references debts(id, user_id),
+  unique (id, user_id),
+  -- only adjustments may be negative (corrections to a manual balance)
+  check (type = 'adjustment' or amount_cents > 0),
+  check (type <> 'transfer' or (to_account_id is not null and to_account_id <> account_id)),
+  check (type = 'transfer' or to_account_id is null),
+  check (type <> 'paycheck' or paycheck_id is not null),
+  check (type <> 'debt_payment' or debt_id is not null)
+);
+create index tx_user_date_idx on transactions(user_id, occurred_on);
+-- A paycheck or a one-time job payment can be deposited at most once (no double counting).
+create unique index tx_paycheck_once on transactions(paycheck_id) where paycheck_id is not null and voided_at is null;
+create unique index tx_opportunity_once on transactions(opportunity_id) where opportunity_id is not null and voided_at is null;
