@@ -258,3 +258,15 @@ create table bill_payments (
   foreign key (transaction_id, user_id) references transactions(id, user_id),
   unique (bill_id, due_date)            -- one payment per bill occurrence
 );
+
+create table savings_goals (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references app_users(id) on delete cascade,
+  name text not null,
+  target_cents bigint not null check (target_cents > 0),
+  target_date date,
+  monthly_target_cents bigint check (monthly_target_cents > 0),
+  status text not null default 'active' check (status in ('active','achieved','archived')),
+  created_at timestamptz not null default now(),
+  unique (id, user_id)
+);
