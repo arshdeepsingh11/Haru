@@ -1,7 +1,12 @@
 import { formatMoney } from "./money";
 import { addDays, type ISODate, localDate, localTime, todayIn, zonedToUtc } from "./time";
 
-export type ReminderCategory = "shift" | "log_hours" | "payday" | "bill" | "goal" | "opportunity" | "custom";
+export type ReminderCategory = "shift" | "checkout" | "log_hours" | "payday" | "bill" | "goal" | "opportunity" | "custom";
+
+export interface ReminderPayload {
+  shiftId?: string;
+  actions?: { action: string; title: string }[];
+}
 
 export interface NotifyPrefs {
   categories: Partial<Record<ReminderCategory, boolean>>;
@@ -21,6 +26,7 @@ export interface PlannedReminder {
   dedupeKey: string;
   sourceType: string;
   sourceId: string | null;
+  payload?: ReminderPayload;
 }
 
 export interface PlannerInput {
@@ -29,7 +35,17 @@ export interface PlannerInput {
   currency: string;
   prefs: NotifyPrefs;
   windowHours?: number;
-  shifts: { id: string; job_name: string; work_date: ISODate; starts_at: Date | null; ends_at: Date | null; status: string }[];
+  shifts: {
+    id: string;
+    job_name: string;
+    work_date: ISODate;
+    starts_at: Date | null;
+    ends_at: Date | null;
+    status: string;
+    attendance?: string;
+    take_home_cents?: number;
+    pay_date?: ISODate | null;
+  }[];
   bills: { id: string; name: string; amount_cents: number; next_due_date: ISODate }[];
   paydays: { job_id: string; job_name: string; pay_date: ISODate; expected_gross_cents: number }[];
   opportunities: { id: string; name: string; status: string; work_date: ISODate | null; starts_at: Date | null }[];
@@ -53,37 +69,62 @@ export function planAutoReminders(i: PlannerInput): PlannedReminder[] {
   };
   const money = (c: number) => formatMoney(c, i.currency);
 
+  const payLabel = (d: ISODate | null | undefined) => {
+    if (!d) return "";
+    const [, mm, dd] = d.split("-").map(Number);
+    return ` It goes into your ${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][mm - 1]} ${dd} paycheck.`;
+  };
+
   if (on("shift")) {
     for (const s of i.shifts) {
-      if (s.status !== "scheduled" || !s.starts_at) continue;
+      if (s.status !== "scheduled" || !s.starts_at || s.attendance === "not_going") continue;
       const fireAt = new Date(s.starts_at.getTime() - i.prefs.shiftLeadMinutes * 60000);
+      const earn = s.take_home_cents != null ? `Go and earn ${money(s.take_home_cents)} after tax.` : "";
+      const lead = i.prefs.shiftLeadMinutes >= 60 && i.prefs.shiftLeadMinutes % 60 === 0 ? `${i.prefs.shiftLeadMinutes / 60} hour${i.prefs.shiftLeadMinutes === 60 ? "" : "s"}` : `${i.prefs.shiftLeadMinutes} min`;
       push({
         category: "shift",
-        title: `${s.job_name} shift at ${localTime(s.starts_at, i.tz)}`,
-        body: i.prefs.shiftLeadMinutes > 0 ? `Starts in ${i.prefs.shiftLeadMinutes} minutes.` : "Starting now.",
+        title: `${s.job_name} in ${lead} (${localTime(s.starts_at, i.tz)})`,
+        body: `${earn}${payLabel(s.pay_date)} Are you going?`.trim(),
         url: "/",
         fireAt,
         dedupeKey: `shift:${s.id}:${fireAt.toISOString()}`,
         sourceType: "shift",
         sourceId: s.id,
+        payload: { shiftId: s.id, actions: [{ action: "going", title: "I'm going" }, { action: "skip", title: "Can't go" }] },
       });
     }
   }
 
-  if (on("log_hours")) {
+  if (on("checkout")) {
+    // After each shift: "Did you finish?" — one tap logs the full shift.
+    for (const s of i.shifts) {
+      if (s.status !== "scheduled" || s.attendance === "not_going") continue;
+      const fireAt = s.ends_at ? new Date(s.ends_at.getTime() + 10 * 60000) : zonedToUtc(s.work_date, i.prefs.logHoursTime, i.tz);
+      push({
+        category: "checkout",
+        title: `Did you finish your ${s.job_name} shift?`,
+        body: s.take_home_cents != null ? `Full shift = ${money(s.take_home_cents)} after tax. Tap to log it or enter your hours.` : "Tap to log your hours.",
+        url: `/?checkout=${s.id}`,
+        fireAt,
+        dedupeKey: `checkout:${s.id}:${fireAt.toISOString()}`,
+        sourceType: "checkout",
+        sourceId: s.id,
+        payload: { shiftId: s.id, actions: [{ action: "full", title: "Worked full shift" }, { action: "partial", title: "Fewer hours" }] },
+      });
+    }
+  }
+
+  if (on("log_hours") && i.prefs.categories.log_hours === true) {
     const today = todayIn(i.tz, i.now);
     for (const day of [today, addDays(today, 1)]) {
-      const pending = i.shifts.filter((s) => s.status === "scheduled" && s.work_date === day);
+      const pending = i.shifts.filter((s) => s.status === "scheduled" && s.work_date === day && !s.ends_at);
       if (pending.length === 0) continue;
-      let fireAt = zonedToUtc(day, i.prefs.logHoursTime, i.tz);
-      const lastEnd = Math.max(...pending.map((s) => (s.ends_at ? s.ends_at.getTime() : 0)));
-      if (lastEnd + 15 * 60000 > fireAt.getTime()) fireAt = new Date(lastEnd + 15 * 60000);
       push({
         category: "log_hours",
         title: "Log today's hours",
         body: `Confirm the hours you worked at ${[...new Set(pending.map((s) => s.job_name))].join(" and ")}.`,
-        url: "/?ask=log",
-        fireAt,
+        url: "/",
+        fireAt: zonedToUtc(day, i.prefs.logHoursTime, i.tz),
         dedupeKey: `log_hours:${day}`,
         sourceType: "log_hours",
         sourceId: null,

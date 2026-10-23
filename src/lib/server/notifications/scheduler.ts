@@ -8,6 +8,7 @@ import { listBills } from "../services/finance";
 import { forecastAll } from "../services/payroll";
 import { listOpportunities } from "../services/opportunities";
 import { materializeSchedules } from "../services/shifts";
+import { paycheckContext, takeHome } from "../services/shiftloop";
 import { pushConfigured, sendPush } from "./push";
 
 // Durable, idempotent scheduler. Invoked by an external clock (Supabase pg_cron,
@@ -33,6 +34,7 @@ interface ClaimedReminder {
   source_type: string | null;
   source_id: string | null;
   dedupe_key: string;
+  payload: { shiftId?: string; actions?: { action: string; title: string }[] } | null;
 }
 
 export interface RunResult {
@@ -47,14 +49,21 @@ export interface RunResult {
 async function planForUser(userId: string, now: Date): Promise<number> {
   const ctx = await ctxForUser(userId, now);
   await materializeSchedules(ctx, 3);
-  const [shifts, bills, forecasts, opps] = await Promise.all([
-    sql<{ id: string; job_name: string; work_date: string; starts_at: Date | null; ends_at: Date | null; status: string }[]>`
-      select s.id, j.employer as job_name, s.work_date, s.starts_at, s.ends_at, s.status from shifts s join jobs j on j.id = s.job_id
+  const [shiftRows, bills, forecasts, opps] = await Promise.all([
+    sql<{ id: string; job_id: string; job_name: string; work_date: string; starts_at: Date | null; ends_at: Date | null; status: string; attendance: string; gross_cents: number }[]>`
+      select s.id, s.job_id, j.employer as job_name, s.work_date, s.starts_at, s.ends_at, s.status, s.attendance, s.gross_cents
+      from shifts s join jobs j on j.id = s.job_id
       where s.user_id = ${userId} and s.status = 'scheduled' and s.work_date between ${addDays(ctx.today, -1)} and ${addDays(ctx.today, 2)}`,
     listBills(ctx),
     forecastAll(ctx),
     listOpportunities(ctx, sql, { active: true }),
   ]);
+  // Each shift carries what it earns after tax and which paycheck it lands in.
+  const shifts = [];
+  for (const r of shiftRows) {
+    const pc = await paycheckContext(ctx, r.job_id, r.work_date).catch(() => null);
+    shifts.push({ ...r, take_home_cents: takeHome(ctx, r.gross_cents), pay_date: pc?.payDate ?? null });
+  }
   const plan = planAutoReminders({
     now,
     tz: ctx.tz,
@@ -76,8 +85,9 @@ async function planForUser(userId: string, now: Date): Promise<number> {
   let inserted = 0;
   for (const r of plan) {
     const res = await sql`
-      insert into reminders (user_id, category, title, body, url, fire_at, origin, source_type, source_id, dedupe_key)
-      values (${userId}, ${r.category}, ${r.title}, ${r.body}, ${r.url}, ${r.fireAt}, 'auto', ${r.sourceType}, ${r.sourceId}, ${r.dedupeKey})
+      insert into reminders (user_id, category, title, body, url, fire_at, origin, source_type, source_id, dedupe_key, payload)
+      values (${userId}, ${r.category}, ${r.title}, ${r.body}, ${r.url}, ${r.fireAt}, 'auto', ${r.sourceType}, ${r.sourceId}, ${r.dedupeKey},
+              ${sql.json((r.payload ?? {}) as never)})
       on conflict (user_id, dedupe_key) do nothing`;
     inserted += res.count;
   }
@@ -95,9 +105,10 @@ async function planForUser(userId: string, now: Date): Promise<number> {
 async function stillRelevant(r: ClaimedReminder): Promise<boolean> {
   if (r.origin !== "auto") return true;
   switch (r.source_type) {
-    case "shift": {
-      const [s] = await sql<{ status: string }[]>`select status from shifts where id = ${r.source_id} and user_id = ${r.user_id}`;
-      return s?.status === "scheduled";
+    case "shift":
+    case "checkout": {
+      const [s] = await sql<{ status: string; attendance: string }[]>`select status, attendance from shifts where id = ${r.source_id} and user_id = ${r.user_id}`;
+      return s?.status === "scheduled" && s.attendance !== "not_going";
     }
     case "log_hours": {
       const day = r.dedupe_key.split(":")[1];
@@ -134,7 +145,7 @@ export async function claimDue(limit = 100): Promise<ClaimedReminder[]> {
     )
     update reminders r set status = 'sending', locked_at = now(), attempts = r.attempts + 1
     from due where r.id = due.id
-    returning r.id, r.user_id, r.category, r.title, r.body, r.url, r.fire_at, r.attempts, r.origin, r.source_type, r.source_id, r.dedupe_key`;
+    returning r.id, r.user_id, r.category, r.title, r.body, r.url, r.fire_at, r.attempts, r.origin, r.source_type, r.source_id, r.dedupe_key, r.payload`;
 }
 
 async function finish(id: string, status: string, error: string | null, retryAt?: Date) {
@@ -181,7 +192,16 @@ export async function deliver(r: ClaimedReminder, now: Date): Promise<"delivered
     const [d] = await sql<{ id: string }[]>`
       insert into notification_deliveries (user_id, reminder_id, subscription_id, kind, status)
       values (${r.user_id}, ${r.id}, ${s.id}, 'reminder', 'failed') returning id`;
-    const res = await sendPush(s, { title: r.title, body: r.body ?? undefined, url: r.url, tag: r.id, deliveryId: d.id });
+    const res = await sendPush(s, {
+      title: r.title,
+      body: r.body ?? undefined,
+      url: r.url,
+      tag: r.id,
+      deliveryId: d.id,
+      kind: r.category,
+      shiftId: r.payload?.shiftId,
+      actions: r.payload?.actions,
+    });
     if (res.ok) {
       accepted++;
       await sql`update notification_deliveries set status = 'accepted', http_status = ${res.status} where id = ${d.id}`;

@@ -7,6 +7,10 @@ export interface PushPayload {
   url?: string;
   tag?: string; // same tag replaces an earlier notification on the device (duplicate guard)
   deliveryId?: string;
+  kind?: string;
+  shiftId?: string;
+  /** Up to two buttons shown on the notification (supported on Chrome/Edge/Android). */
+  actions?: { action: string; title: string }[];
 }
 
 export interface PushTarget {
