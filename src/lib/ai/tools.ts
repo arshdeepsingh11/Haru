@@ -41,6 +41,8 @@ import { setObservationStatus } from "../server/services/observations";
 import { getDashboard } from "../server/services/dashboard";
 import { compareReports, generateReport } from "../server/services/reports";
 import { pushConfigured } from "../server/notifications/push";
+import { checkoutShift, setAttendance } from "../server/services/shiftloop";
+import { getCoach, getPayoffPlan } from "../server/services/coach";
 
 export type Risk = "read" | "write" | "confirm";
 
@@ -318,6 +320,51 @@ export const TOOLS: ToolDef[] = [
     },
   }),
 
+  tool({
+    name: "get_motivation",
+    description: "The user's next shift (what it earns after tax, which paycheck it lands in, how many days closer it brings their focus goal), this week's shifts, shifts waiting for check-out, and attendance stats (streak, missed shifts and money missed).",
+    schema: Empty,
+    risk: "read",
+    run: async (ctx) => {
+      const c = await getCoach(ctx);
+      const m = (x: number) => money(ctx, x);
+      const card = (s: NonNullable<typeof c.nextShift>) => ({ shift_id: s.id, job: s.jobName, date: s.date, time: s.start ? `${s.start}–${s.end}` : null, hours: s.minutes / 60, take_home_after_tax: m(s.takeHomeCents), gross: m(s.grossCents), paycheck_date: s.payDate, paycheck_projected_after_tax: m(s.paycheckProjectedCents), days_closer_to_focus_goal: s.daysCloser, attendance: s.attendance });
+      return {
+        summary: "Motivation data",
+        data: {
+          tax_percent: c.taxPercent,
+          next_shift: c.nextShift ? card(c.nextShift) : null,
+          this_week: c.week.map(card),
+          waiting_for_checkout: c.checkouts.map(card),
+          stats_last_30_days: { worked: c.stats.workedShifts, missed: c.stats.missedShifts, money_missed_after_tax: m(c.stats.missedTakeHomeCents), attendance_rate: c.stats.attendanceRate, streak: c.stats.streak, earned_this_month_after_tax: m(c.stats.monthTakeHomeCents) },
+          focus: c.plan.focus ? { name: c.plan.focus.name, finish: c.plan.focus.finishDate } : null,
+        },
+      };
+    },
+  }),
+  tool({
+    name: "get_payoff_plan",
+    description: "What to pay first and when each debt and goal is finished, based on the work schedule's take-home after tax, monthly bills and minimum payments. Debts by highest interest first, then goals.",
+    schema: Empty,
+    risk: "read",
+    run: async (ctx) => {
+      const p = await getPayoffPlan(ctx);
+      const m = (x: number) => money(ctx, x);
+      return {
+        summary: "Payoff plan",
+        data: {
+          monthly_take_home_from_schedule: m(p.monthlyTakeHomeCents),
+          monthly_bills: m(p.monthlyBillsCents),
+          monthly_minimum_payments: m(p.monthlyMinimumsCents),
+          free_each_month: m(p.surplusCents),
+          order: p.items.map((x, n) => ({ step: n + 1, name: x.name, kind: x.kind, remaining: m(x.remainingCents), finish_date: x.finishDate ?? "not reachable at this pace", on_track_for_target: x.onTrack, why: x.reason })),
+          debt_free_date: p.debtFreeDate,
+          warnings: p.warnings,
+        },
+      };
+    },
+  }),
+
   // ------------------------------------------------------------------ writes: work
   tool({
     name: "create_job",
@@ -387,6 +434,20 @@ export const TOOLS: ToolDef[] = [
       return `Delete the ${s.job_name} shift on ${s.work_date} (${formatHours(s.paid_minutes)}, ${money(ctx, s.gross_cents)} gross).`;
     },
     run: (ctx, a) => deleteShift(ctx, a.shift_id, "ai"),
+  }),
+  tool({
+    name: "set_shift_attendance",
+    description: "Before a scheduled shift: record whether the user is going (true) or can't make it (false, marks it missed).",
+    schema: V.ShiftAttendance,
+    risk: "write",
+    run: (ctx, a) => setAttendance(ctx, a.shift_id, a.going, "ai"),
+  }),
+  tool({
+    name: "checkout_shift",
+    description: "After a scheduled shift: log it as fully worked (full=true), worked fewer hours (hours=n), or missed (missed=true). Computes earnings and the updated paycheck.",
+    schema: V.ShiftCheckout,
+    risk: "write",
+    run: (ctx, a) => checkoutShift(ctx, a.shift_id, a, "ai"),
   }),
   tool({
     name: "create_work_opportunity",
