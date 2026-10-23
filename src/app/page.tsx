@@ -20,7 +20,6 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
     return <Unavailable message={publicMessage(e)} />;
   }
   if (!ctx) redirect("/login");
-  if (!ctx.prefs.onboarded_at) redirect("/onboarding");
 
   try {
     // Keep generated schedule shifts and observations current; failures here are non-fatal.

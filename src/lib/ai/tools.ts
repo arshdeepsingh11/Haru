@@ -12,7 +12,9 @@ import { affordability } from "../domain/position";
 import { resolveRange } from "../domain/ranges";
 import { evaluateOpportunity } from "../domain/opportunity";
 import { localTime } from "../domain/time";
-import { COMPONENT_KEYS, type LayoutEntry } from "../dashboard-registry";
+import { CARD_KEYS, CARDS, type CardKey } from "../dashboard-registry";
+import { changeCards, getCards } from "../server/services/cards";
+import { completeOnboarding } from "../server/services/prefs";
 import { createJob, getJob, jobLabel, listJobs, payRuleOf, updateJob, wagesFor } from "../server/services/jobs";
 import { createShift, deleteShift, getShift, listShifts, updateShift } from "../server/services/shifts";
 import { createOpportunity, describeOpportunity, getOpportunity, listOpportunities, updateOpportunityStatus } from "../server/services/opportunities";
@@ -50,8 +52,17 @@ export interface ToolOutput {
   summary: string;
   data?: unknown;
   undo?: UndoOp[];
-  display?: { kind: "report"; report: unknown; compare?: unknown; period: string; start?: string; end?: string } | { kind: "dashboard" };
+  display?: ToolDisplay;
+  /** Dashboard cards this call put on screen (shown as a "built" chip in chat). */
+  cardsAdded?: CardKey[];
 }
+
+export type ToolDisplay =
+  | { kind: "report"; report: unknown; compare?: unknown; period: string; start?: string; end?: string }
+  | { kind: "dashboard"; added?: CardKey[]; removed?: CardKey[] }
+  | { kind: "enable_push" }
+  | { kind: "scan_schedule" }
+  | { kind: "setup_done" };
 
 export interface ToolDef<S extends z.ZodType = z.ZodType> {
   name: string;
@@ -538,22 +549,42 @@ export const TOOLS: ToolDef[] = [
     },
   }),
   tool({
-    name: "update_dashboard",
-    description: `Reorder, show or hide registered dashboard components. Keys: ${COMPONENT_KEYS.join(", ")}. 'order' puts the listed keys first; 'show' pins; 'hide' removes.`,
-    schema: z.object({ order: z.array(z.enum(COMPONENT_KEYS as [string, ...string[]])).optional(), show: z.array(z.enum(COMPONENT_KEYS as [string, ...string[]])).optional(), hide: z.array(z.enum(COMPONENT_KEYS as [string, ...string[]])).optional() }),
+    name: "build_dashboard",
+    description: `You build this user's dashboard. It starts empty and only shows the cards you put there. Add a card as soon as the data it shows exists (cards for records you just created are added automatically), remove cards the user doesn't want or that stopped being useful, and reorder when priorities change. Cards: ${CARD_KEYS.map((k) => `${k} (${CARDS[k].description})`).join("; ")}.`,
+    schema: z.object({
+      add: z.array(z.enum(CARD_KEYS as [CardKey, ...CardKey[]])).optional(),
+      remove: z.array(z.enum(CARD_KEYS as [CardKey, ...CardKey[]])).optional(),
+      order: z.array(z.enum(CARD_KEYS as [CardKey, ...CardKey[]])).optional().describe("Keys to move to the top, in this order"),
+    }),
     risk: "write",
     run: async (ctx, a) => {
-      const [row] = await sql<{ layout: LayoutEntry[] }[]>`select layout from dashboard_preferences where user_id = ${ctx.userId}`;
-      const prev = row?.layout ?? [];
-      type K = LayoutEntry["key"];
-      const hidden = new Set<K>([...prev.filter((l) => l.hidden).map((l) => l.key), ...((a.hide ?? []) as K[])]);
-      for (const k of [...(a.show ?? []), ...(a.order ?? [])] as K[]) hidden.delete(k);
-      const order = ([...(a.order ?? []), ...prev.filter((l) => !l.hidden).map((l) => l.key), ...(a.show ?? [])] as K[]).filter((k, i, xs) => xs.indexOf(k) === i && !hidden.has(k));
-      const layout: LayoutEntry[] = [...order.map((k) => ({ key: k })), ...[...hidden].map((k) => ({ key: k, hidden: true }))];
-      await sql`insert into dashboard_preferences (user_id, layout, previous_layout) values (${ctx.userId}, ${sql.json(layout as never)}, ${sql.json(prev as never)})
-                on conflict (user_id) do update set layout = excluded.layout, previous_layout = dashboard_preferences.layout, updated_at = now()`;
-      return { summary: `Dashboard updated${a.order?.length ? ` (first: ${a.order.join(", ")})` : ""}${a.hide?.length ? `, hidden: ${a.hide.join(", ")}` : ""}${a.show?.length ? `, shown: ${a.show.join(", ")}` : ""}.`, undo: [{ op: "layout", layout: prev }], display: { kind: "dashboard" } };
+      const r = await changeCards(ctx, a);
+      return { summary: r.summary, undo: [{ op: "cards", cards: r.prev }], display: { kind: "dashboard", added: r.added, removed: r.removed }, cardsAdded: r.added, data: { now_showing: (await getCards(ctx)).show } };
     },
+  }),
+  tool({
+    name: "complete_setup",
+    description: "Call once the setup conversation has covered goals, jobs with pay rates and pay calendars, schedule (or the user said it changes weekly), regular expenses, bank balance and the tax percent. Marks setup finished and opens their dashboard.",
+    schema: Empty,
+    risk: "write",
+    run: async (ctx) => {
+      await completeOnboarding(ctx);
+      return { summary: "Setup finished. Your dashboard is ready.", display: { kind: "setup_done" } };
+    },
+  }),
+  tool({
+    name: "offer_schedule_scan",
+    description: "Show a button that lets the user take or upload a photo of their work schedule. HARU reads the shifts and the user checks and edits them before saving. Offer it when asking about their schedule.",
+    schema: Empty,
+    risk: "read",
+    run: async () => ({ summary: "Showed the schedule photo button.", display: { kind: "scan_schedule" } }),
+  }),
+  tool({
+    name: "offer_notifications",
+    description: "Show a button that turns on push notifications on this phone (1 hour before each shift with what it earns, and a check-in after). Offer it near the end of setup, or when the user asks about reminders.",
+    schema: Empty,
+    risk: "read",
+    run: async () => ({ summary: "Showed the notifications button.", display: { kind: "enable_push" } }),
   }),
   tool({
     name: "dismiss_observation",

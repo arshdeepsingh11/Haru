@@ -7,6 +7,8 @@ import { logActivity } from "../server/activity";
 import { getProvider, ProviderUnavailable, type Block, type ChatMessage, type ChatProvider } from "./provider";
 import { buildSystemPrompt } from "./prompt";
 import { riskOf, TOOL_MAP, toolSpecs, type ToolOutput } from "./tools";
+import { autoPlace } from "../server/services/cards";
+import type { CardKey } from "../dashboard-registry";
 
 const MAX_STEPS = 8;
 const HISTORY = 16;
@@ -113,6 +115,10 @@ export interface TurnResult {
   user: MessageView;
   assistant: MessageView;
   changed: boolean;
+  /** Dashboard cards that appeared during this turn. */
+  cardsAdded: CardKey[];
+  /** The model could not be reached; nothing was stored, so the client can simply retry. */
+  retryable?: boolean;
 }
 
 /** One user turn: model ↔ tools loop over HARU's authorised services. */
@@ -142,6 +148,7 @@ export async function runTurn(ctx: Ctx, input: { conversationId?: string | null;
   messages.push({ role: "user", content: [{ type: "text", text }] });
 
   const actionIds: string[] = [];
+  const cardsAdded: CardKey[] = [];
   let changed = false;
   let finalText = "";
   let failed = false;
@@ -182,8 +189,10 @@ export async function runTurn(ctx: Ctx, input: { conversationId?: string | null;
             continue;
           }
           const out = await t.run(ctx, parsed.data);
+          for (const k of out.cardsAdded ?? []) if (!cardsAdded.includes(k)) cardsAdded.push(k);
           if (risk === "write") {
             changed = true;
+            for (const k of await autoPlace(ctx, t.name).catch((e) => (logError("cards.autoPlace", e), [] as CardKey[]))) if (!cardsAdded.includes(k)) cardsAdded.push(k);
             actionIds.push(await saveAction(ctx, conversationId, { tool: t.name, args: parsed.data, risk, status: "completed", summary: out.summary, undo: out.undo ?? null, result: out.display ? { display: out.display } : null }));
           } else if (out.display) {
             actionIds.push(await saveAction(ctx, conversationId, { tool: t.name, args: parsed.data, risk, status: "completed", summary: out.summary, result: { display: out.display } }));
@@ -209,6 +218,19 @@ export async function runTurn(ctx: Ctx, input: { conversationId?: string | null;
       : `${why} Nothing was changed.`;
   }
 
+  if (failed && actionIds.length === 0) {
+    await sql`delete from ai_messages where id = ${userMsg.id} and user_id = ${ctx.userId}`;
+    const now = new Date().toISOString();
+    return {
+      conversationId,
+      changed: false,
+      cardsAdded: [],
+      retryable: true,
+      user: { id: `u-${userMsg.id}`, role: "user", content: text, createdAt: now, actions: [] },
+      assistant: { id: `err-${userMsg.id}`, role: "assistant", content: finalText, createdAt: now, actions: [], error: true },
+    };
+  }
+
   const [asst] = await sql<{ id: string; created_at: Date }[]>`
     insert into ai_messages (user_id, conversation_id, role, content, meta)
     values (${ctx.userId}, ${conversationId}, 'assistant', ${finalText}, ${sql.json({ error: failed } as never)}) returning id, created_at`;
@@ -220,7 +242,8 @@ export async function runTurn(ctx: Ctx, input: { conversationId?: string | null;
 
   return {
     conversationId,
-    changed,
+    changed: changed || cardsAdded.length > 0,
+    cardsAdded,
     user: { id: userMsg.id, role: "user", content: text, createdAt: userMsg.created_at.toISOString(), actions: [] },
     assistant: { id: asst.id, role: "assistant", content: finalText, createdAt: asst.created_at.toISOString(), actions: actions.map(toView), error: failed },
   };
@@ -253,6 +276,7 @@ export async function resolveAction(ctx: Ctx, actionId: string, decision: "confi
       if (claim.count === 0) throw new AppError("This action was already handled.", 409);
       try {
         const out = await t.run(ctx, parsed.data);
+        await autoPlace(ctx, t.name).catch((e) => logError("cards.autoPlace", e));
         await sql`update ai_actions set summary = ${out.summary}, undo = ${out.undo ? sql.json(out.undo as never) : null},
                    result = ${out.display ? sql.json({ display: out.display } as never) : null} where id = ${a.id}`;
         reply = `Done. ${out.summary}`;

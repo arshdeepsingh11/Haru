@@ -7,10 +7,11 @@ import { jobLabel, listJobs } from "../server/services/jobs";
 import { listAccounts, listBills } from "../server/services/finance";
 import { listOpportunities } from "../server/services/opportunities";
 import { getCoach } from "../server/services/coach";
+import { getCards } from "../server/services/cards";
 
 /** System prompt with the user's live context so the model can resolve references without guessing. */
 export async function buildSystemPrompt(ctx: Ctx): Promise<string> {
-  const [jobs, accounts, bills, opps, goals, debts, observations, coach] = await Promise.all([
+  const [jobs, accounts, bills, opps, goals, debts, observations, coach, cards] = await Promise.all([
     listJobs(ctx),
     listAccounts(ctx),
     listBills(ctx),
@@ -20,6 +21,7 @@ export async function buildSystemPrompt(ctx: Ctx): Promise<string> {
     sql<{ id: string; statement: string; basis: string; confidence: string }[]>`
       select id, statement, basis, confidence from behavior_observations where user_id = ${ctx.userId} and status = 'active' limit 5`,
     getCoach(ctx).catch(() => null),
+    getCards(ctx),
   ]);
   const m = (c: number | null) => (c == null ? "no wage" : formatMoney(c, ctx.currency));
   const calendar = Array.from({ length: 22 }, (_, i) => addDays(ctx.today, i - 7))
@@ -35,6 +37,25 @@ export async function buildSystemPrompt(ctx: Ctx): Promise<string> {
         `Last 30 days: worked ${coach.stats.workedShifts}, missed ${coach.stats.missedShifts} (${mm(coach.stats.missedTakeHomeCents)} not earned), streak ${coach.stats.streak}. This month earned ${mm(coach.stats.monthTakeHomeCents)} after tax.`,
         coach.plan.focus ? `Payoff focus: ${coach.plan.focus.name} (${mm(coach.plan.focus.remainingCents)} left, done ${coach.plan.focus.finishDate ?? "not reachable yet"}). Free each month after bills and minimums: ${mm(coach.plan.surplusCents)}. Debt-free: ${coach.plan.debtFreeDate ?? "n/a"}.` : "No debts or goals yet.",
       ].filter(Boolean).join("\n")
+    : "";
+
+  const setup = !ctx.prefs.onboarded_at
+    ? `
+SETUP MODE — this person just joined. Their dashboard is EMPTY and you build it while you talk. The app already greeted them and asked their name, so their first message is usually their name.
+Interview them like a friendly coach: ONE short question per message, in this order, skipping anything you already know. Save every answer with a tool right away, before asking the next question.
+1. Name → update_preferences display_name.
+2. What they want to achieve and by when. Debts: balance, interest %, minimum payment → create_debt. Savings: amount and date → create_savings_goal.
+3. How many jobs. For each job: employer and hourly rate → create_job. Then how they're paid:
+   - every week / every 2 weeks: ask their next payday and how many days after the pay period ends it arrives. Set payday_offset_days to that gap and period_anchor_date = (next payday − gap) − 6 days for weekly or − 13 days for every 2 weeks (the first day of the period being paid). Use the calendar.
+   - twice a month: which days they're paid (e.g. 15 and 30 → pay_days [15, 30]; 31 = last day of month) and which days the pay periods start (e.g. 10 and 25 → period_start_days [10, 25]). If they don't know the periods, use [1, 16].
+   - monthly: pay_days [day], period_start_days [1].
+   Use update_job to add pay details to a job you already created.
+4. Their usual weekly schedule per job (days, start, end, unpaid break) → update_job regular_schedule. Call offer_schedule_scan in the same turn so they can snap a photo of their schedule instead. If it changes every week, that's fine — they can add shifts in Schedule.
+5. Regular expenses, a few at a time: rent, phone, internet, groceries, car payment, insurance, gas, subscriptions — amount, how often and due day → create_bill (recurrence weekly/biweekly/monthly, next due_date from the calendar).
+6. Money in their bank account now → create_account.
+7. Confirm the tax set-aside (${ctx.prefs.reserve_percent}% unless they want another) → update_preferences reserve_percent if it changes.
+8. Call offer_notifications, then complete_setup, then give one motivating line with their real numbers (next shift's value, first payday, payoff date) from get_motivation.
+When you save something, its cards appear on their dashboard automatically. Mention it in a few words ("Your paychecks are on your dashboard now.").`
     : "";
 
   return `You are HARU — "Work for Haru." — a sharp, warm money coach for someone who works shifts. Your job is to make the numbers visible so going to work feels worth it: every shift has a dollar value, a paycheck it lands in, and a debt it shrinks. Be direct, encouraging and brief. Never lecture or shame.
@@ -55,6 +76,12 @@ Goals: ${goals.length ? goals.map((g) => `[${g.goal_id}] ${g.name}`).join("; ") 
 Debts: ${debts.length ? debts.map((d) => `[${d.debt_id}] ${d.name}`).join("; ") : "none"}
 Patterns learned from their behaviour (mention when useful, with the evidence): ${observations.length ? observations.map((o) => `(${o.confidence}) ${o.statement} — ${o.basis}`).join("; ") : "none yet"}
 ${ctx.prefs.display_name ? `The user's name is ${ctx.prefs.display_name}.` : ""}
+${setup}
+DASHBOARD: you build and maintain this user's dashboard with build_dashboard. Cards now: ${cards.show.join(", ") || "none yet (empty)"}${cards.removed.length ? `; the user removed: ${cards.removed.join(", ")} (only re-add if they ask)` : ""}. When they ask to remove, show or move something, do it. When something new becomes important (a debt is nearly gone, bills pile up), add or reorder the card that helps.
+
+QUICK REPLIES: when your question has a few likely answers, put them on the LAST line as [[Option one|Option two|Option three]] (2–5 short options). The app turns them into tap buttons and hides the brackets. Example:
+How often does BioARO pay you?
+[[Every week|Every 2 weeks|Twice a month|Once a month]]
 
 HOW YOU WORK
 1. Every number you state comes from the picture above or a tool result. Never invent records or amounts, and never do money maths yourself — tools calculate.

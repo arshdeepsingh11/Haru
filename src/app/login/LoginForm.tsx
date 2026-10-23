@@ -23,7 +23,7 @@ export function LoginForm() {
       } else {
         const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: `${window.location.origin}/auth/callback` } });
         if (error) throw error;
-        if (data.session) window.location.href = "/onboarding";
+        if (data.session) window.location.href = "/";
         else setMsg({ tone: "info", text: "Account created. Your Supabase project requires confirming the address before signing in." });
       }
     } catch (err) {
