@@ -43,8 +43,21 @@
 
   <!-- Wordmark -->
   <g transform="translate(96 112)">
-    <rect width="56" height="56" rx="16" fill="url(#edge)"/>
-    <text x="28" y="40" text-anchor="middle" class="t" font-size="34" font-weight="700" fill="#fff">$</text>
+    <g transform="scale(0.875)">
+  <defs>
+    <linearGradient id="bnt" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6e56ff"/><stop offset=".55" stop-color="#4b6dff"/><stop offset="1" stop-color="#1fb6dc"/></linearGradient>
+    <radialGradient id="bng" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff"/><stop offset=".35" stop-color="#e3faff" stop-opacity=".8"/><stop offset="1" stop-color="#9bf2ff" stop-opacity="0"/></radialGradient>
+    <radialGradient id="bns" cx=".25" cy=".15" r=".9"><stop offset="0" stop-color="#fff" stop-opacity=".3"/><stop offset=".55" stop-color="#fff" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#bnt)"/><rect width="64" height="64" rx="16" fill="url(#bns)"/>
+  <g fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M32.2 10.5v4.3" stroke-width="5"/>
+    <path d="M32.2 54.6v-3.3" stroke-width="5"/>
+    <path d="M43 22.6c-1.9-3.1-5.6-5-10.6-5-6.5 0-11 3.2-11 8.2 0 4.8 3.7 6.8 11 8.2" pathLength="100" stroke-width="5.6" stroke-linecap="butt" stroke-dasharray="15 5.5 38 5.5 22 100"/>
+    <path d="M32.4 34c7.5 1.4 11.6 3.6 11.6 8.8 0 5.2-4.8 8.7-11.6 8.7-5.4 0-9.7-2.2-11.5-5.8" pathLength="100" stroke-width="5.6" stroke-dasharray="0 14 86 100"/>
+  </g>
+  <circle cx="32.3" cy="33.4" r="7.5" fill="url(#bng)"/>
+  <path d="M32.3 29.2 L33.05 32.65 L36.5 33.4 L33.05 34.15 L32.3 37.6 L31.55 34.15 L28.1 33.4 L31.55 32.65 Z" fill="#fff"/></g>
     <text x="74" y="39" class="t" font-size="28" font-weight="700" letter-spacing="4" fill="#12142b">HARU</text>
   </g>
   <text x="96" y="262" class="t" font-size="58" font-weight="700" fill="#12142b" letter-spacing="-1.5">Every shift</text>
