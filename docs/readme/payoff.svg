@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="420" viewBox="0 0 1280 420" role="img" aria-label="Example payoff projection">
+  <defs>
+    <linearGradient id="aur" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#6e56ff"/><stop offset=".55" stop-color="#2bc8e8"/><stop offset="1" stop-color="#ff6fb5"/></linearGradient>
+    <linearGradient id="fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6e56ff" stop-opacity=".28"/><stop offset="1" stop-color="#2bc8e8" stop-opacity="0"/></linearGradient>
+  </defs>
+  <style>.t{font-family:'Segoe UI',Helvetica,Arial,sans-serif}.draw{stroke-dasharray:1400;stroke-dashoffset:1400;animation:dr 2.6s cubic-bezier(.2,.8,.2,1) forwards}@keyframes dr{to{stroke-dashoffset:0}}@media (prefers-reduced-motion:reduce){.draw{animation:none;stroke-dashoffset:0}}</style>
+  <rect width="1280" height="420" rx="28" fill="#fff" stroke="#12142b" stroke-opacity=".06"/>
+  <text x="48" y="56" class="t" font-size="20" font-weight="700" fill="#12142b">Payoff plan, projected</text>
+  <text x="48" y="82" class="t" font-size="14" fill="#5b6282">Example: $2,400 Visa at 22.99%, two jobs, $1,090 free each month. Highest interest first, then the emergency fund.</text>
+  <g class="t" font-size="12" fill="#969cb4">
+    <text x="80" y="356">Oct</text><text x="260" y="356">Nov</text><text x="440" y="356">Dec</text><text x="620" y="356">Jan</text><text x="800" y="356">Feb</text><text x="980" y="356">Mar</text><text x="1160" y="356">Apr</text>
+    <text x="60" y="134" text-anchor="end">$3k</text><text x="60" y="234" text-anchor="end">$1.5k</text><text x="60" y="334" text-anchor="end">$0</text>
+  </g>
+  <path d="M70 130 H1220 M70 230 H1220 M70 330 H1220" stroke="#12142b" stroke-opacity=".06"/>
+  <!-- Visa balance -->
+  <path d="M80 170 L260 240 L440 296 L620 330 L1220 330 L1220 330 L80 330 Z" fill="url(#fill)"/>
+  <path class="draw" d="M80 170 L260 240 L440 296 L620 330 L1220 330" fill="none" stroke="url(#aur)" stroke-width="4" stroke-linejoin="round"/>
+  <!-- Emergency fund growing -->
+  <path class="draw" d="M80 323 L620 316 L800 250 L980 186 L1160 130" fill="none" stroke="#12142b" stroke-width="2.5" stroke-dasharray="7 7"/>
+  <circle cx="620" cy="330" r="9" fill="#fff" stroke="#6e56ff" stroke-width="4"/>
+  <g transform="translate(560 252)"><rect width="150" height="50" rx="16" fill="#12142b"/><text x="16" y="21" class="t" font-size="12" fill="#c9c0ff">Debt-free</text><text x="16" y="40" class="t" font-size="16" font-weight="700" fill="#fff">Jan 28, 2027</text></g>
+  <circle cx="1160" cy="130" r="8" fill="#12142b"/>
+  <g transform="translate(990 92)"><text class="t" font-size="13" font-weight="600" fill="#12142b">Emergency fund $3,000 · Apr</text></g>
+  <g transform="translate(80 382)" class="t" font-size="13"><rect width="18" height="4" y="-5" rx="2" fill="url(#aur)"/><text x="26" fill="#5b6282">Visa balance</text><rect x="140" width="18" height="3" y="-5" fill="#12142b"/><text x="166" fill="#5b6282">Emergency fund</text></g>
+</svg>

@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="520" viewBox="0 0 1280 520" role="img" aria-label="HARU — every shift has a number">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f7f8fd"/><stop offset="1" stop-color="#eef1fa"/></linearGradient>
+    <radialGradient id="l1" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#6e56ff" stop-opacity=".22"/><stop offset="1" stop-color="#6e56ff" stop-opacity="0"/></radialGradient>
+    <radialGradient id="l2" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#2bc8e8" stop-opacity=".22"/><stop offset="1" stop-color="#2bc8e8" stop-opacity="0"/></radialGradient>
+    <radialGradient id="l3" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#ff6fb5" stop-opacity=".18"/><stop offset="1" stop-color="#ff6fb5" stop-opacity="0"/></radialGradient>
+    <radialGradient id="orbBase" cx="0.5" cy="0.55" r="0.55"><stop offset="0" stop-color="#b9adff"/><stop offset=".5" stop-color="#8c7bff"/><stop offset="1" stop-color="#6e56ff"/></radialGradient>
+    <radialGradient id="sheen" cx="0.32" cy="0.26" r="0.45"><stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset=".4" stop-color="#fff" stop-opacity=".3"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+    <filter id="blur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="22"/></filter>
+    <filter id="halo" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="36"/></filter>
+    <clipPath id="orbClip"><circle cx="960" cy="260" r="150"/></clipPath>
+    <linearGradient id="aur" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#6e56ff"/><stop offset=".45" stop-color="#4f8bff"/><stop offset=".75" stop-color="#2bc8e8"/><stop offset="1" stop-color="#ff6fb5"/></linearGradient>
+    <linearGradient id="edge" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6e56ff"/><stop offset=".6" stop-color="#2bc8e8"/><stop offset="1" stop-color="#ff6fb5"/></linearGradient>
+  </defs>
+  <style>
+    .t{font-family:'Segoe UI',Helvetica,Arial,sans-serif}
+    .spin1{animation:o 9s linear infinite;transform-origin:960px 260px}
+    .spin2{animation:o 13s linear infinite reverse;transform-origin:960px 260px}
+    .spin3{animation:o 7s linear infinite;transform-origin:960px 260px}
+    .breathe{animation:b 5s ease-in-out infinite;transform-origin:960px 260px}
+    .drift{animation:d 18s ease-in-out infinite alternate}
+    @keyframes o{to{transform:rotate(360deg)}}
+    @keyframes b{50%{transform:scale(1.04)}}
+    @keyframes d{to{transform:translate(-40px,20px)}}
+    @media (prefers-reduced-motion:reduce){.spin1,.spin2,.spin3,.breathe,.drift{animation:none}}
+  </style>
+  <rect width="1280" height="520" rx="32" fill="url(#bg)"/>
+  <g class="drift"><circle cx="220" cy="80" r="300" fill="url(#l1)"/><circle cx="1180" cy="120" r="280" fill="url(#l2)"/><circle cx="760" cy="520" r="300" fill="url(#l3)"/></g>
+  <rect x="1" y="1" width="1278" height="518" rx="31" fill="none" stroke="#12142b" stroke-opacity=".06"/>
+
+  <!-- Aurora orb -->
+  <circle cx="960" cy="270" r="190" fill="#6e56ff" opacity=".28" filter="url(#halo)" class="breathe"/>
+  <g class="breathe">
+    <circle cx="960" cy="260" r="150" fill="url(#orbBase)"/>
+    <g clip-path="url(#orbClip)" filter="url(#blur)">
+      <g class="spin1"><circle cx="1010" cy="230" r="95" fill="#2bc8e8"/></g>
+      <g class="spin2"><circle cx="910" cy="300" r="105" fill="#ff6fb5" opacity=".9"/></g>
+      <g class="spin3"><circle cx="960" cy="200" r="70" fill="#9bf2ff"/></g>
+    </g>
+    <circle cx="960" cy="260" r="150" fill="url(#sheen)"/>
+    <circle cx="960" cy="260" r="149" fill="none" stroke="#fff" stroke-opacity=".6"/>
+  </g>
+
+  <!-- Wordmark -->
+  <g transform="translate(96 112)">
+    <rect width="56" height="56" rx="16" fill="url(#edge)"/>
+    <text x="28" y="40" text-anchor="middle" class="t" font-size="34" font-weight="700" fill="#fff">$</text>
+    <text x="74" y="39" class="t" font-size="28" font-weight="700" letter-spacing="4" fill="#12142b">HARU</text>
+  </g>
+  <text x="96" y="262" class="t" font-size="58" font-weight="700" fill="#12142b" letter-spacing="-1.5">Every shift</text>
+  <text x="96" y="328" class="t" font-size="58" font-weight="700" fill="url(#aur)" letter-spacing="-1.5">has a number.</text>
+  <text x="98" y="378" class="t" font-size="21" fill="#5b6282">An AI money coach for people who work shifts.</text>
+  <text x="98" y="408" class="t" font-size="21" fill="#5b6282">Talk to it, and it builds your dashboard.</text>
+
+  <!-- Floating chip: next shift -->
+  <g transform="translate(1090 400)">
+    <rect width="160" height="64" rx="20" fill="#fff" stroke="#12142b" stroke-opacity=".06"/>
+    <text x="18" y="26" class="t" font-size="13" fill="#969cb4">Next shift</text>
+    <text x="18" y="50" class="t" font-size="22" font-weight="700" fill="url(#aur)">+$146.30</text>
+  </g>
+  <g transform="translate(700 70)">
+    <rect width="150" height="44" rx="22" fill="#fff" stroke="#12142b" stroke-opacity=".06"/>
+    <circle cx="24" cy="22" r="7" fill="url(#edge)"/>
+    <text x="40" y="28" class="t" font-size="15" font-weight="600" fill="#12142b">4 days sooner</text>
+  </g>
+</svg>

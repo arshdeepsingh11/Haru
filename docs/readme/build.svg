@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="560" viewBox="0 0 1280 560" role="img" aria-label="You talk; Haru builds your dashboard card by card">
+  <defs>
+    <linearGradient id="aur" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#6e56ff"/><stop offset=".55" stop-color="#2bc8e8"/><stop offset="1" stop-color="#ff6fb5"/></linearGradient>
+    <radialGradient id="orb" cx=".4" cy=".35" r=".7"><stop offset="0" stop-color="#e6f9ff"/><stop offset=".35" stop-color="#9fb2ff"/><stop offset=".7" stop-color="#7a63ff"/><stop offset="1" stop-color="#ff86c3"/></radialGradient>
+  </defs>
+  <style>.t{font-family:'Segoe UI',Helvetica,Arial,sans-serif}
+  .c{opacity:0;animation:in 9s infinite}.c1{animation-delay:.6s}.c2{animation-delay:2.2s}.c3{animation-delay:3.8s}.c4{animation-delay:5.4s}
+  .m{opacity:0;animation:in 9s infinite}.m1{animation-delay:0s}.m2{animation-delay:1.6s}.m3{animation-delay:3.2s}.m4{animation-delay:4.8s}
+  @keyframes in{0%{opacity:0;transform:translateY(10px)}6%{opacity:1;transform:none}88%{opacity:1}100%{opacity:0}}
+  @media (prefers-reduced-motion:reduce){.c,.m{animation:none;opacity:1}}</style>
+  <rect width="1280" height="560" rx="28" fill="#f6f7fc" stroke="#12142b" stroke-opacity=".06"/>
+  <text x="48" y="58" class="t" font-size="20" font-weight="700" fill="#12142b">You talk. Haru builds.</text>
+  <text x="48" y="84" class="t" font-size="15" fill="#5b6282">The dashboard starts empty. Every answer you give becomes a card.</text>
+
+  <!-- phone: chat -->
+  <g transform="translate(80 110)">
+    <rect width="420" height="420" rx="36" fill="#fff" stroke="#12142b" stroke-opacity=".08"/>
+    <circle cx="44" cy="44" r="16" fill="url(#orb)"/><text x="70" y="50" class="t" font-size="16" font-weight="700" fill="#12142b">Haru</text>
+    <g class="m m1"><rect x="150" y="84" width="246" height="40" rx="20" fill="#12142b"/><text x="168" y="109" class="t" font-size="14" fill="#fff">BioARO, $22/h, paid 15th &amp; 30th</text></g>
+    <g class="m m2"><rect x="24" y="140" width="290" height="40" rx="20" fill="#f1f3fa"/><text x="42" y="165" class="t" font-size="14" fill="#12142b">Saved. Which days do you work?</text></g>
+    <g class="m m3"><rect x="186" y="196" width="210" height="40" rx="20" fill="#12142b"/><text x="204" y="221" class="t" font-size="14" fill="#fff">📷 sent a schedule photo</text></g>
+    <g class="m m4"><rect x="24" y="252" width="330" height="40" rx="20" fill="#f1f3fa"/><text x="42" y="277" class="t" font-size="14" fill="#12142b">Added 6 shifts. I owe $2,400 on Visa…</text></g>
+    <rect x="24" y="352" width="372" height="44" rx="22" fill="#f6f7fc" stroke="url(#aur)" stroke-width="2"/><text x="48" y="379" class="t" font-size="14" fill="#969cb4">Message Haru…</text>
+  </g>
+
+  <!-- arrow -->
+  <g transform="translate(530 300)"><path d="M0 0 H150" stroke="#6e56ff" stroke-width="3" stroke-dasharray="6 8" fill="none"/><path d="M150 -8 L164 0 L150 8" fill="#2bc8e8"/></g>
+
+  <!-- phone: dashboard -->
+  <g transform="translate(720 110)">
+    <rect width="480" height="420" rx="36" fill="#fff" stroke="#12142b" stroke-opacity=".08"/>
+    <text x="28" y="50" class="t" font-size="20" font-weight="700" fill="#12142b">Good evening, Arsh</text>
+    <g class="c c1"><rect x="24" y="72" width="432" height="96" rx="22" fill="#fff" stroke="url(#aur)" stroke-width="2"/><text x="44" y="100" class="t" font-size="13" fill="#5b6282">Next shift · Tomorrow 4 PM</text><text x="44" y="146" class="t" font-size="36" font-weight="700" fill="url(#aur)">+$146.30</text></g>
+    <g class="c c2"><rect x="24" y="182" width="208" height="84" rx="20" fill="#f6f7fc"/><text x="42" y="210" class="t" font-size="13" fill="#5b6282">Oct 30 paycheck</text><text x="42" y="246" class="t" font-size="24" font-weight="700" fill="#12142b">$984.20</text></g>
+    <g class="c c3"><rect x="248" y="182" width="208" height="84" rx="20" fill="#f6f7fc"/><text x="266" y="210" class="t" font-size="13" fill="#5b6282">Next 7 days</text><text x="266" y="246" class="t" font-size="24" font-weight="700" fill="#12142b">$564.30</text></g>
+    <g class="c c4"><rect x="24" y="280" width="432" height="112" rx="22" fill="#f6f7fc"/><text x="44" y="310" class="t" font-size="14" font-weight="700" fill="#12142b">Payoff plan</text><text x="44" y="334" class="t" font-size="13" fill="#5b6282">1. Visa · $2,400 · done Jan 28</text><rect x="44" y="352" width="392" height="8" rx="4" fill="#e6e9f4"/><rect x="44" y="352" width="140" height="8" rx="4" fill="url(#aur)"/><text x="44" y="382" class="t" font-size="12" fill="#969cb4">Each shift: 4 days sooner</text></g>
+  </g>
+</svg>

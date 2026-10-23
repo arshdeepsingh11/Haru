@@ -1,10 +1,10 @@
+<div align="center"><img src="docs/readme/banner.svg" alt="HARU: every shift has a number" width="100%" /></div>
+
 # HARU
 
-**Work for Haru.**
+**Work for Haru.** The full product story, with diagrams, is in **[HARU.md](HARU.md)**.
 
 HARU is a personal work-and-money assistant: one AI command center and one adaptive dashboard over a single PostgreSQL database. It tracks multiple jobs with independent payroll rules, shifts, one-time work offers, paychecks, cash, bills, savings goals and debt. It sends real push notifications from the server, so reminders arrive even when the site isn't open.
-
-See **[HARU.md](HARU.md)** for what HARU is, who it's for and how the shift loop works.
 
 Every financial number is computed by deterministic code from stored records. The AI understands requests and calls authorised, validated tools; it never does the arithmetic and never writes to the database directly.
 
@@ -16,6 +16,7 @@ Every financial number is computed by deterministic code from stored records. Th
 | --- | --- |
 | Schema, constraints, views, RLS lockdown | `db/migrations/0001_init.sql` |
 | Shift loop: attendance, check-out, custom pay calendars, behaviour memory | `db/migrations/0002_shift_loop.sql` |
+| AI-built dashboard cards | `db/migrations/0003_ai_dashboard.sql` |
 | Database integrity tests (14) | `db/tests/integrity.sql` |
 | Pure financial / payroll / time-zone logic | `src/lib/domain/*` |
 | User-scoped services (jobs, shifts, payroll, money, reports, dashboard) | `src/lib/server/services/*` |
@@ -128,6 +129,7 @@ Reminder categories and timing (minutes before shifts, the time to nudge you to 
 | `NEXT_PUBLIC_SUPABASE_URL` | yes | Public. |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | yes | Public by design; it cannot read HARU's tables (see RLS above). |
 | `GEMINI_API_KEY` | for the AI (free) | Server only. Preferred when set. |
+| `HARU_AI_FALLBACK_MODELS` | optional | Comma-separated Gemini models tried when the main one is busy. Default: `gemini-3.6-flash,gemini-3.5-flash-lite,gemini-2.5-flash`. Empty string disables fallback. |
 | `ANTHROPIC_API_KEY` | for the AI | Server only. |
 | `HARU_AI_MODEL` | no | Default `claude-sonnet-5-5`. |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | for push | Public. |

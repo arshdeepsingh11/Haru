@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="300" viewBox="0 0 1280 300" role="img" aria-label="The shift loop">
+  <defs><linearGradient id="aur" gradientUnits="userSpaceOnUse" x1="110" y1="0" x2="1170" y2="0"><stop offset="0" stop-color="#6e56ff"/><stop offset=".55" stop-color="#2bc8e8"/><stop offset="1" stop-color="#ff6fb5"/></linearGradient></defs>
+  <style>.t{font-family:'Segoe UI',Helvetica,Arial,sans-serif}.dot{animation:p 2.4s ease-in-out infinite}@keyframes p{50%{r:13}}.run{animation:r 6s linear infinite}@keyframes r{from{stroke-dashoffset:0}to{stroke-dashoffset:-56}}@media (prefers-reduced-motion:reduce){.dot,.run{animation:none}}</style>
+  <rect width="1280" height="300" rx="28" fill="#fff" stroke="#12142b" stroke-opacity=".06"/>
+  <text x="48" y="54" class="t" font-size="20" font-weight="700" fill="#12142b">The shift loop</text>
+  <text x="200" y="54" class="t" font-size="14" fill="#969cb4">push notifications with buttons, works without opening the app</text>
+  <path d="M110 150 H1170" stroke="#eceff7" stroke-width="6" stroke-linecap="round"/>
+  <path class="run" d="M110 150 H1170" stroke="url(#aur)" stroke-width="6" stroke-linecap="round" stroke-dasharray="40 16"/>
+  <g class="t">
+    <circle class="dot" cx="140" cy="150" r="10" fill="#6e56ff"/>
+    <text x="140" y="112" text-anchor="middle" font-size="13" font-weight="700" fill="#6e56ff">1 hour before</text>
+    <text x="140" y="196" text-anchor="middle" font-size="15" font-weight="600" fill="#12142b">"Go and earn $146.30.</text>
+    <text x="140" y="218" text-anchor="middle" font-size="15" font-weight="600" fill="#12142b">Are you going?"</text>
+    <text x="140" y="244" text-anchor="middle" font-size="13" fill="#5b6282">[I'm going] [Can't make it]</text>
+
+    <circle class="dot" cx="470" cy="150" r="10" fill="#4f8bff"/>
+    <text x="470" y="112" text-anchor="middle" font-size="13" font-weight="700" fill="#4f8bff">Tap a button</text>
+    <text x="470" y="196" text-anchor="middle" font-size="15" font-weight="600" fill="#12142b">Going: "4 days closer</text>
+    <text x="470" y="218" text-anchor="middle" font-size="15" font-weight="600" fill="#12142b">to clearing your Visa"</text>
+    <text x="470" y="244" text-anchor="middle" font-size="13" fill="#5b6282">Skip: "$146.30 you won't earn"</text>
+
+    <circle class="dot" cx="810" cy="150" r="10" fill="#2bc8e8"/>
+    <text x="810" y="112" text-anchor="middle" font-size="13" font-weight="700" fill="#1aa6c9">10 min after it ends</text>
+    <text x="810" y="196" text-anchor="middle" font-size="15" font-weight="600" fill="#12142b">"Did you finish?"</text>
+    <text x="810" y="244" text-anchor="middle" font-size="13" fill="#5b6282">[Full shift] [Fewer hours]</text>
+
+    <circle class="dot" cx="1140" cy="150" r="10" fill="#ff6fb5"/>
+    <text x="1140" y="112" text-anchor="middle" font-size="13" font-weight="700" fill="#e0559a">Every penny logged</text>
+    <text x="1140" y="196" text-anchor="middle" font-size="15" font-weight="600" fill="#12142b">"+$104.50 after tax.</text>
+    <text x="1140" y="218" text-anchor="middle" font-size="15" font-weight="600" fill="#12142b">Oct 30 paycheck: $612"</text>
+    <text x="1140" y="244" text-anchor="middle" font-size="13" fill="#5b6282">Haru learns your patterns</text>
+  </g>
+</svg>

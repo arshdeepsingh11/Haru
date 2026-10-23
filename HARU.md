@@ -1,223 +1,168 @@
 <div align="center">
 
-# $ HARU
+<img src="docs/readme/banner.svg" alt="HARU: every shift has a number" width="100%" />
 
-### Work for Haru.
+<br />
 
-**An AI money coach that thinks in shifts, not salaries.**
+<img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-12142b?style=for-the-badge&logo=nextdotjs&logoColor=white" />
+<img alt="React 19" src="https://img.shields.io/badge/React-19-6e56ff?style=for-the-badge&logo=react&logoColor=white" />
+<img alt="TypeScript strict" src="https://img.shields.io/badge/TypeScript-strict-4f8bff?style=for-the-badge&logo=typescript&logoColor=white" />
+<img alt="Supabase Postgres" src="https://img.shields.io/badge/Supabase-Postgres-2bc8e8?style=for-the-badge&logo=supabase&logoColor=white" />
+<br />
+<img alt="Gemini with fallback" src="https://img.shields.io/badge/AI-Gemini%20%2B%20fallback-ff6fb5?style=for-the-badge&logo=googlegemini&logoColor=white" />
+<img alt="Web Push" src="https://img.shields.io/badge/Web%20Push-VAPID-12142b?style=for-the-badge&logo=pwa&logoColor=white" />
+<img alt="Tests" src="https://img.shields.io/badge/tests-69%20passing-6e56ff?style=for-the-badge" />
+<img alt="PWA" src="https://img.shields.io/badge/phone--first-PWA-2bc8e8?style=for-the-badge" />
 
-`Next.js 16` · `React 19` · `Supabase Postgres` · `Gemini / Claude` · `Web Push` · `PWA`
+<h3>Work for Haru.</h3>
+
+An AI money coach for people paid by the hour. You talk to Haru, and it builds your money dashboard.
+
+[What it is](#what-it-is) · [Who it's for](#who-its-for) · [How it works](#how-it-works) · [Under the hood](#under-the-hood) · [Run it](#run-it)
 
 </div>
 
 ---
 
-## What we built
+## What it is
 
-HARU is a personal work-and-money app for people who are paid by the hour, often at more than one job. You never type "I make $X a month". You tell HARU your **jobs, pay rates, schedules and pay calendars**, and it works out everything else:
+Most budget apps start with *"What's your monthly income?"* People who work shifts can't answer that. Their income is a schedule that changes every week, at two or three jobs, each with its own rate and its own payday.
 
-- what every single shift is worth **after tax**
-- which **paycheck** that money lands in, and how big that paycheck is so far
-- how many **days sooner** each shift gets you to your goal
-- what to pay off first, and **when you'll be debt-free**
+Haru never asks for monthly income. It asks about your **jobs, pay rates, pay calendar and schedule**, and works the money out from those:
 
-Then it stays with you. An hour before every shift it asks *"Are you going?"* and shows what you'll earn. After the shift it asks *"Did you finish?"* and logs every penny.
+| You tell Haru | Haru shows you |
+|---|---|
+| "BioARO, $22 an hour, paid the 15th and 30th" | Your next paycheck, with the shifts already counted toward it |
+| "I work Fri–Sun, 4 to 11" *(or a photo of the roster)* | **+$146.30 after tax** on every shift, before you go |
+| "I owe $2,400 on my Visa at 22.99%" | What to pay first, and the date you'll be debt-free |
+| "Phone $115 on the 25th, groceries about $90 a week" | What's safe to spend until payday |
 
-## Why
+The dashboard **starts empty**. Each answer you give adds a card. Haru adds, removes and reorders cards as your life changes, and you can ask it to: *"take spending off, put the payoff plan first."*
 
-People who live shift-to-shift don't have a monthly income. They have a schedule that changes, two or three employers with different pay days, overtime one week and a cancelled shift the next. Budget apps built around a salary don't fit, so they get abandoned.
-
-Skipping a shift feels free in the moment. HARU makes the cost visible: **"$123.50 you won't earn. Your debt-free date moves 4 days later."** Going feels like progress: **"Let's go. This shift is +$123.50 and puts you 4 days closer."**
-
-The goal is motivation backed by real arithmetic, never guesses.
+<img src="docs/readme/build.svg" alt="You talk, Haru builds the dashboard card by card" width="100%" />
 
 ## Who it's for
 
-| | |
-|---|---|
-| 👷 **Hourly workers** | Security, retail, food service, warehouse, care work |
-| 🔀 **Multi-job people** | Two or three jobs, each with its own pay rate and pay calendar |
-| 🎯 **People with a target** | A credit card to clear, a loan to repay, an emergency fund to build, all by a date |
-| 📱 **Phone-first users** | Installed as an app on the home screen, with notifications that have buttons |
+- **Hourly workers** in security, retail, cafés, warehouses and care work.
+- **People with two or three jobs**, each with a different rate and payday.
+- **Anyone with a target and a deadline**: a credit card to clear, a loan, an emergency fund.
+- **Phone-first users.** Haru installs to the home screen and sends notifications with buttons.
 
 ## How it works
 
-### 1. The interview (no forms)
+### 1. A conversation, not a form
 
-HARU asks one question at a time, like a conversation:
-
-```mermaid
-flowchart LR
-    A([Name]) --> B([Goals<br/>debts · savings · dates])
-    B --> C([How many jobs?])
-    C --> D([Each job<br/>employer · $/h])
-    D --> E([Pay calendar<br/>weekly · biweekly ·<br/>15th & 30th · monthly])
-    E --> F([Usual schedule<br/>days · start · end])
-    F --> D
-    F --> G([Expenses<br/>rent · phone · groceries…])
-    G --> H([Bank balance])
-    H --> I([Tax 5%])
-    I --> J([Notifications])
-    J --> K{{Dashboard built}}
-    style K fill:#7c3aed,color:#fff,stroke:#7c3aed
-```
-
-It never asks for monthly income. Income is calculated as **jobs × rates × schedule**.
-
-### 2. The shift loop
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant S as Scheduler (every minute)
-    participant P as Your phone
-    participant H as HARU
-    S->>P: 1 hour before: "Go and earn $123.50 after tax.<br/>It goes into your Oct 30 paycheck. Are you going?"
-    alt I'm going
-        P->>H: going ✓
-        H-->>P: "Let's go. +$123.50, 4 days closer."
-    else Can't make it
-        P->>H: not going
-        H-->>P: "$123.50 you won't earn." (shift marked missed)
-    end
-    S->>P: 10 min after it ends: "Did you finish?"
-    alt Full shift
-        P->>H: full
-    else Fewer hours
-        P->>H: 5.5 h
-    end
-    H-->>P: "Logged 5.5 h: +$104.50 after tax.<br/>Your Oct 30 paycheck is now about $612."
-    H->>H: remember behaviour (shift_events)
-```
-
-The notification buttons work **without opening the app**: the service worker posts the answer and shows the result.
-
-### 3. Paycheck maths: your real calendar
-
-Pay periods and pay days are set per job. Example: periods **10th–24th** and **25th–9th**, paid on the **15th** and **30th**:
-
-```mermaid
-gantt
-    title Work period → payday (twice a month, paid 15th & 30th)
-    dateFormat YYYY-MM-DD
-    axisFormat %b %d
-    section Period A
-    Work Oct 10 – Oct 24      :a1, 2026-10-10, 15d
-    Paid Oct 30               :milestone, 2026-10-30, 0d
-    section Period B
-    Work Oct 25 – Nov 9       :b1, 2026-10-25, 16d
-    Paid Nov 15               :milestone, 2026-11-15, 0d
-```
-
-Supported: **weekly**, **every 2 weeks** (anchored to your next payday and the gap after the period ends), **twice a month** (any two pay days, any two period start days; `31` means the last day of the month), and **monthly**. Weekend paydays follow the job's rule.
-
-### 4. Take-home, every time
+A new person sees one thing: a living aurora orb and the question *"What should I call you?"* From there Haru interviews you one question at a time, with tap-to-answer buttons where they help:
 
 ```
-gross       = hours × rate          (minus unpaid break)
-tax set-aside = gross × 5%          (configurable)
-take-home   = gross − tax set-aside
+goals + deadlines  →  how many jobs  →  each job's rate  →  how it pays
+→  your usual schedule (or 📷 a photo of it)  →  bills: rent, phone, groceries…
+→  bank balance  →  tax set-aside (5%)  →  shift reminders on  →  done
 ```
 
-All money is stored as **integer cents**. Nothing is rounded twice, and floating-point maths never touches a balance.
+Every answer is saved the moment you give it, and its card appears on the dashboard.
+
+### 2. Snap your schedule
+
+Take a photo of a printed roster, a whiteboard or a screenshot from your work app. Haru reads every shift (date, start, end, break, which job), resolves *"Mon / Tue"* to real dates and flags anything it had to guess. **Nothing is saved until you review it.** Every row can be edited, unticked or deleted, and you can add shifts it missed.
+
+### 3. The shift loop
+
+<img src="docs/readme/loop.svg" alt="1 hour before, tap a button, check in after, every penny logged" width="100%" />
+
+The buttons work **from the notification itself**, without opening the app. Every answer (going, skipped, finished, fewer hours) becomes behaviour memory. If you keep missing Saturdays, Haru notices and tells you what it costs.
+
+### 4. Your real pay calendar
+
+Pay is set per job:
+
+| Calendar | Example | How Haru counts it |
+|---|---|---|
+| Every week | Paid Fridays | Period ends, paid *n* days later |
+| Every 2 weeks | Next payday Oct 30, 5 days after the period | Anchored to your next payday |
+| Twice a month | Work 10th–24th → paid 30th; 25th–9th → paid 15th | Custom period start days *and* pay days (31 = last day of the month) |
+| Monthly | Paid the 1st | One period per month |
+
+Weekend paydays follow the job's rule. Take-home is calculated as:
+
+```
+gross     = paid hours × hourly rate        (unpaid breaks removed)
+set-aside = gross × 5%                      (your tax estimate, editable)
+take-home = gross − set-aside
+```
+
+All money is stored as **integer cents**. Floating-point arithmetic never touches a balance.
 
 ### 5. The payoff plan
 
-```mermaid
-flowchart TD
-    I[Projected monthly take-home<br/>from your schedule] --> S[Surplus]
-    B[Bills & expenses] --> S
-    S --> M[Pay every minimum]
-    M --> X[Extra goes to the<br/>highest-interest debt]
-    X --> R[When it's cleared, its minimum<br/>rolls into the next one]
-    R --> G[After the debts: your savings goals]
-    G --> D{{Debt-free date ·<br/>goal dates · days closer per shift}}
-    style D fill:#7c3aed,color:#fff,stroke:#7c3aed
+<img src="docs/readme/payoff.svg" alt="Projected payoff: Visa cleared Jan 28, then the emergency fund" width="100%" />
+
+Haru projects your monthly take-home from your schedule, subtracts bills and minimum payments, and sends what's left to **one target at a time**: highest interest first, then your savings goals. That's where *"this shift gets you 4 days closer"* comes from:
+
+```
+days closer = shift take-home ÷ (monthly surplus ÷ 30.44)
 ```
 
-`daysCloser = shift take-home ÷ (monthly surplus ÷ 30.44)`: this is the "4 days closer" number on every shift card.
+### 6. An AI that acts, carefully
 
-### 6. An AI that does things
+- **47 typed tools.** Every argument is validated with Zod before anything touches the database.
+- **Read, write and confirm levels.** Risky changes (time zone, currency) wait for your tap. Writes come with **Undo**.
+- **Haru never does arithmetic.** Every number comes from deterministic code. The model only decides which tool to call.
+- **Haru knows your situation.** Each turn it sees a live snapshot (next shift, paycheck so far, streak, payoff focus), so replies are short and specific.
+- **Busy servers don't stall you.** If Gemini is overloaded (503) or out of quota (429), Haru retries and then falls back through `gemini-3.8-flash → 3.6-flash → 3.5-flash-lite → 2.5-flash`, re-signing tool-call history so the switch is safe. If every model is busy, nothing is stored and you get a **Retry** button.
 
-Ask in plain words: *"I picked up an extra shift at the restaurant Saturday 5 to 11"*, *"I didn't go today"*, *"how long until my Visa is gone?"*. The assistant has **44 typed tools** (shifts, attendance, checkout, paychecks, bills, debts, goals, payoff plan, reminders and more).
+## Under the hood
 
-- Every tool input is validated with Zod before anything touches the database.
-- Write actions return an **undo**, and risky actions ask to **confirm** first.
-- It sees a live snapshot of *today's picture* (next shift, paycheck so far, streak, plan) so answers are specific and short.
-- It **learns from behaviour**: every going, skip, full or partial shift is stored, and patterns such as "you've missed 3 of the last 4 Saturdays" become gentle observations.
-- Works with **Google Gemini** (free tier) or **Anthropic Claude**. If the provider fails, the exact reason is shown (bad key, quota, wrong model).
-
-## Architecture
+<img src="docs/readme/glance.svg" alt="HARU at a glance" width="100%" />
 
 ```mermaid
 flowchart LR
-    subgraph Phone["📱 Phone / browser (PWA)"]
-        UI[Glass UI<br/>Dashboard · Schedule · Chat]
-        SW[Service worker<br/>push + action buttons]
+    subgraph Phone["📱 Phone · PWA"]
+        UI[Aurora UI<br/>chat · cards · schedule]
+        SW[Service worker<br/>push buttons]
+        CAM[Camera / photos]
     end
-    subgraph Vercel["▲ Vercel"]
-        RSC[Next.js 16<br/>server components + actions]
-        API[/api: shifts · push · chat · cron/]
-        AI[AI agent<br/>44 tools · confirm · undo]
-        DOM[Domain maths<br/>payroll · payoff · reminders]
+    subgraph Vercel["▲ Vercel · Next.js 16"]
+        AG[AI agent<br/>47 tools · confirm · undo]
+        CARDS[Card builder<br/>auto-place · remove · order]
+        SCAN[Schedule reader<br/>vision → JSON → review]
+        DOM[Deterministic maths<br/>payroll · payoff · reminders]
     end
-    subgraph Supa["Supabase"]
-        AUTH[Auth]
-        PG[(Postgres<br/>RLS on · cents · FKs)]
-        CRON[pg_cron every minute<br/>→ pg_net]
+    subgraph Supabase
+        PG[(Postgres<br/>cents · RLS · composite FKs)]
+        CRON[pg_cron every minute]
     end
-    LLM[(Gemini / Claude)]
-    PUSH[(Web Push<br/>VAPID)]
-
-    UI <--> RSC
-    SW <--> API
-    RSC --> DOM
-    API --> DOM
-    RSC --> AI --> LLM
-    AI --> DOM
-    DOM <--> PG
-    RSC --> AUTH
-    CRON --> API
-    API --> PUSH --> SW
+    LLM[(Gemini ⇢ fallbacks<br/>or Claude)]
+    UI <--> AG --> LLM
+    AG --> CARDS --> PG
+    CAM --> SCAN --> LLM
+    AG --> DOM <--> PG
+    CRON --> SW
 ```
 
-**Reliable notifications.** The scheduler plans reminders into a table with **dedupe keys**, claims them with `FOR UPDATE SKIP LOCKED`, retries failures, and re-checks before sending, so a cancelled or skipped shift never pings you. The device confirms delivery back to the server.
-
-## By the numbers
-
-```mermaid
-xychart-beta
-    title "Verified test coverage by suite"
-    x-axis ["Domain maths", "Gemini adapter", "Tool schemas", "Integration (real Postgres)"]
-    y-axis "Passing tests" 0 --> 30
-    bar [23, 5, 8, 26]
-```
-
-| Metric | Value |
+| Layer | Choices |
 |---|---|
-| AI tools | **44**, all schema-validated |
-| Pay calendars | weekly · biweekly · twice-monthly (custom days) · monthly |
-| Money precision | integer cents end to end |
-| Reminder lead | 60 min before each shift, check-in 10 min after |
-| Default tax set-aside | 5%, editable |
-| Notification cadence | every minute (pg_cron) |
-| Data isolation | composite foreign keys per user · RLS with no public access |
+| App | Next.js 16 App Router, React 19, server actions, strict TypeScript |
+| Look | Light aurora glass. Unbounded for money figures, Geist for text. One animated orb is Haru's presence: it drifts when idle, swirls while thinking and breathes when it answers |
+| Data | Supabase Postgres via postgres.js, row-level security on with no public access, money in cents |
+| AI | Provider-neutral adapter (Gemini REST or Anthropic SDK), Zod → JSON Schema tools, vision for schedules |
+| Notifications | Web Push (VAPID), durable reminder queue with dedupe keys, `FOR UPDATE SKIP LOCKED`, retries, delivery receipts |
+| Safety | Every write is user-scoped and validated, every AI action is logged with undo, and text inside your records is treated as data, never as instructions |
 
-## Design
-
-White and violet **glassmorphism**: frosted panels (`backdrop-blur`) floating over soft violet light, a violet gradient hero for the next shift, gradient area charts for take-home, and a **$** mark as the logo. Sora for type. Built mobile-first and installable as an app.
-
-## Running it
+## Run it
 
 ```bash
 npm install
-cp .env.example .env.local     # Supabase URL/keys, DATABASE_URL, GEMINI_API_KEY, VAPID keys
-npm run db:migrate             # applies 0001_init + 0002_shift_loop
+cp .env.example .env.local        # Supabase URL + anon key, DATABASE_URL, GEMINI_API_KEY, VAPID keys
+npm run db:migrate                # 0001 init · 0002 shift loop · 0003 AI-built dashboard
 npm run dev
 ```
 
-Tests: `npm test` (domain, Gemini, tool schemas) · `npm run test:integration` against a throwaway database.
+`npm test` runs the domain, Gemini and tool-schema tests. `npm run test:integration` runs the end-to-end suite against a throwaway Postgres.
 
----
-
-<div align="center"><b>$ HARU</b> · Work for Haru.</div>
+<div align="center">
+<br />
+<img src="public/icons/icon.svg" width="44" alt="" />
+<br />
+<sub><b>HARU</b>: work for Haru.</sub>
+</div>
