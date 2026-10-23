@@ -47,10 +47,12 @@ export function periodContaining(rule: PayRule, date: ISODate): { start: ISODate
       return { start, end: addDays(start, len - 1) };
     }
     case "semimonthly": {
+      if (rule.payDays?.length && !rule.periodStartDays?.length) return payDayPeriod(rule.payDays, date);
       const starts = sortedStarts(rule.periodStartDays, [1, (rule.splitDay ?? 15) + 1]);
       return calendarPeriod(starts, date);
     }
     case "monthly":
+      if (rule.payDays?.length && !rule.periodStartDays?.length) return payDayPeriod(rule.payDays.slice(0, 1), date);
       return rule.periodStartDays?.length ? calendarPeriod([rule.periodStartDays[0]], date) : { start: startOfMonth(date), end: endOfMonth(date) };
   }
 }
@@ -71,6 +73,28 @@ function calendarPeriod(starts: number[], date: ISODate): { start: ISODate; end:
   for (const c of all) if (c <= date) start = c;
   const next = all.find((c) => c > start)!;
   return { start, end: addDays(next, -1) };
+}
+
+/**
+ * When only the pay days are known ("paid on the 15th and 30th"), each paycheck covers the work
+ * since the previous payday, up to and including its own payday. 30/31 clamp to short months.
+ */
+export function payDayPeriod(payDays: number[], date: ISODate): { start: ISODate; end: ISODate } {
+  const { year, month } = splitDate(date);
+  const dates = [...new Set([month - 2, month - 1, month, month + 1, month + 2].flatMap((m) => payDays.map((d) => makeDate(year, m, Math.min(Math.max(d, 1), 31)))))].sort();
+  const idx = dates.findIndex((d) => d >= date);
+  return { start: addDays(dates[idx - 1], 1), end: dates[idx] };
+}
+
+/** Weekly/biweekly: from the next payday and how long after the period it arrives, find a period start. */
+export function anchorFromNextPayday(frequency: "weekly" | "biweekly", nextPayday: ISODate, offsetDays: number): ISODate {
+  const len = frequency === "weekly" ? 7 : 14;
+  return addDays(addDays(nextPayday, -offsetDays), -(len - 1));
+}
+
+/** The next date (today included) that falls on the given weekday (0 = Sunday). */
+export function nextWeekday(today: ISODate, weekday: number): ISODate {
+  return addDays(today, (weekday - weekdayOf(today) + 7) % 7);
 }
 
 export function adjustForWeekend(date: ISODate, rule: WeekendRule): ISODate {

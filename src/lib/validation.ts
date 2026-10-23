@@ -34,6 +34,8 @@ export const JobCreate = z.object({
   period_start_days: z.array(z.number().int().min(1).max(28)).min(1).max(2).optional().describe("Twice a month: days pay periods start, e.g. [10, 25]. Monthly: [1]"),
   pay_days: z.array(z.number().int().min(1).max(31)).min(1).max(2).optional().describe("Twice a month / monthly: calendar pay days, e.g. [15, 30]; 31 = last day of month"),
   payday_offset_days: z.number().int().min(0).max(31).optional().describe("Days after the period ends that pay arrives"),
+  next_payday: zDate.optional().describe("Weekly/every 2 weeks: the date of their next (or today's) payday. HARU works out the pay periods from it."),
+  payday_weekday: z.number().int().min(0).max(6).optional().describe("Weekly: the weekday they're paid, 0=Sunday … 5=Friday. Use when they say 'paid every Friday'."),
   payday_weekend_rule: zWeekendRule.optional(),
   deduction_percent: z.number().min(0).max(99).optional().describe("Known payroll deductions as % of gross, only if the user states it"),
   deduction_fixed: zMoney.optional().describe("Known fixed deduction per paycheck, only if the user states it"),

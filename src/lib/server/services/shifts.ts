@@ -89,7 +89,12 @@ export async function createShift(ctx: Ctx, input: ShiftCreate, actor: Actor): P
       order by s.starts_at nulls last`;
 
     if (status === "completed") {
-      const scheduled = sameDay.find((s) => s.status === "scheduled");
+      // Two shifts on one day (e.g. 18:00 and 23:30): complete the one whose start time matches best.
+      const open = sameDay.filter((s) => s.status === "scheduled");
+      const scheduled =
+        t.startsAt && open.length > 1
+          ? [...open].sort((a, b) => Math.abs((a.starts_at?.getTime() ?? 0) - t.startsAt!.getTime()) - Math.abs((b.starts_at?.getTime() ?? 0) - t.startsAt!.getTime()))[0]
+          : open[0];
       if (scheduled) {
         const before = snapshot(scheduled as unknown as Record<string, unknown>, SHIFT_COLS as unknown as string[]);
         await tx`

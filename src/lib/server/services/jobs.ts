@@ -5,7 +5,8 @@ import { AppError, NotFound } from "../errors";
 import { logActivity, type Actor } from "../activity";
 import { snapshot, type UndoOp } from "../undo";
 import { toCents } from "../../domain/money";
-import { validateRule, type PayRule } from "../../domain/payroll";
+import { anchorFromNextPayday, nextPayPeriod, nextWeekday, validateRule, type PayRule } from "../../domain/payroll";
+import { friendlyDate, weekdayName } from "../../domain/time";
 import type { JobCreate, JobUpdate } from "../../validation";
 
 export interface JobRow {
@@ -80,6 +81,34 @@ export async function wagesFor(ctx: Ctx, jobId: string, q: Q = sql) {
     select rate_cents, effective_from from job_wages where job_id = ${jobId} and user_id = ${ctx.userId} order by effective_from`;
 }
 
+/** Weekly pay in people's words ("paid every Friday", "next payday Oct 30") → the stored pay rule. */
+const DEFAULT_WEEKLY_GAP = 6; // if unknown: the week ending the Saturday before a Friday payday
+export function resolvePayInput<T extends Partial<JobCreate>>(input: T, existing: JobRow | undefined, today: string): T {
+  const freq = input.pay_frequency ?? existing?.pay_frequency ?? null;
+  const out = { ...input };
+  if ((freq === "weekly" || freq === "biweekly") && (input.next_payday || input.payday_weekday != null)) {
+    const next = input.next_payday ?? nextWeekday(today, input.payday_weekday!);
+    const gap = input.payday_offset_days ?? (existing && existing.pay_frequency === freq && existing.period_anchor_date ? existing.payday_offset_days : DEFAULT_WEEKLY_GAP);
+    out.period_anchor_date = anchorFromNextPayday(freq, next, gap);
+    out.payday_offset_days = gap;
+  }
+  // Calendar pay days alone define the periods ("15th and 30th"): drop any stale period starts.
+  if ((freq === "semimonthly" || freq === "monthly") && input.pay_days?.length && input.period_start_days === undefined && existing?.period_start_days?.length) {
+    (out as Partial<JobCreate>).period_start_days = undefined;
+  }
+  delete (out as Partial<JobCreate>).next_payday;
+  delete (out as Partial<JobCreate>).payday_weekday;
+  return out;
+}
+
+/** "Next payday Fri, Oct 30 (for work Oct 17 to Oct 30)": read back so mistakes are visible at once. */
+export function describeNextPayday(j: JobRow, today: string): string {
+  const rule = payRuleOf(j);
+  if (!rule || validateRule(rule)) return "Pay schedule not set yet.";
+  const p = nextPayPeriod(rule, today);
+  return `Next payday ${weekdayName(p.payDate).slice(0, 3)}, ${friendlyDate(p.payDate)}${p.payDate === today ? " (today)" : ""}, for work ${friendlyDate(p.start)} to ${friendlyDate(p.end)}.`;
+}
+
 function checkRule(input: Partial<JobCreate>, existing?: JobRow) {
   const freq = input.pay_frequency ?? existing?.pay_frequency ?? null;
   if (!freq) return;
@@ -92,7 +121,8 @@ function checkRule(input: Partial<JobCreate>, existing?: JobRow) {
   if (err) throw new AppError(err);
 }
 
-export async function createJob(ctx: Ctx, input: JobCreate, actor: Actor): Promise<ServiceResult<JobRow>> {
+export async function createJob(ctx: Ctx, raw: JobCreate, actor: Actor): Promise<ServiceResult<JobRow>> {
+  const input = resolvePayInput(raw, undefined, ctx.today);
   checkRule(input);
   return sql.begin(async (tx) => {
     const [job] = await tx<{ id: string }[]>`
@@ -114,7 +144,7 @@ export async function createJob(ctx: Ctx, input: JobCreate, actor: Actor): Promi
     const full = await getJob(ctx, job.id, tx);
     await logActivity(tx, ctx.userId, { entity: "job", entityId: job.id, action: "create", actor, summary: `Added job ${jobLabel(full)}`, after: full });
     return {
-      summary: `Added ${jobLabel(full)} at ${(toCents(input.hourly_rate) / 100).toFixed(2)}/h`,
+      summary: `Added ${jobLabel(full)} at ${(toCents(input.hourly_rate) / 100).toFixed(2)}/h. ${describeNextPayday(full, ctx.today)}`,
       data: full,
       undo: [{ op: "delete", table: "jobs", id: job.id }],
     };
@@ -141,9 +171,10 @@ const JOB_COLS = [
 ] as const;
 
 /** Changes job details. A new hourly rate is added to wage history — past shifts keep their rate. */
-export async function updateJob(ctx: Ctx, input: JobUpdate, actor: Actor): Promise<ServiceResult<JobRow>> {
+export async function updateJob(ctx: Ctx, raw: JobUpdate, actor: Actor): Promise<ServiceResult<JobRow>> {
   return sql.begin(async (tx) => {
-    const before = await getJob(ctx, input.job_id, tx);
+    const before = await getJob(ctx, raw.job_id, tx);
+    const input = resolvePayInput(raw, before, ctx.today);
     checkRule(input, before);
     const patch: Record<string, unknown> = {};
     if (input.employer !== undefined) patch.employer = input.employer;
@@ -154,7 +185,7 @@ export async function updateJob(ctx: Ctx, input: JobUpdate, actor: Actor): Promi
     if (input.pay_frequency !== undefined) patch.pay_frequency = input.pay_frequency;
     if (input.period_anchor_date !== undefined) patch.period_anchor_date = input.period_anchor_date;
     if (input.semimonthly_split_day !== undefined) patch.semimonthly_split_day = input.semimonthly_split_day;
-    if (input.period_start_days !== undefined) patch.period_start_days = tx.array(input.period_start_days);
+    if ("period_start_days" in input) patch.period_start_days = input.period_start_days ? tx.array(input.period_start_days) : null;
     if (input.pay_days !== undefined) patch.pay_days = tx.array(input.pay_days);
     if (input.payday_offset_days !== undefined) patch.payday_offset_days = input.payday_offset_days;
     if (input.payday_weekend_rule !== undefined) patch.payday_weekend_rule = input.payday_weekend_rule;
@@ -184,7 +215,7 @@ export async function updateJob(ctx: Ctx, input: JobUpdate, actor: Actor): Promi
     if (changes.length === 0) throw new AppError("Nothing to change.");
     const after = await getJob(ctx, before.id, tx);
     await logActivity(tx, ctx.userId, { entity: "job", entityId: before.id, action: "update", actor, summary: `Updated ${jobLabel(after)}: ${changes.join(", ")}`, before, after });
-    return { summary: `Updated ${jobLabel(after)} (${changes.join(", ")})`, data: after, undo };
+    return { summary: `Updated ${jobLabel(after)} (${changes.join(", ")}). ${describeNextPayday(after, ctx.today)}`, data: after, undo };
   });
 }
 
