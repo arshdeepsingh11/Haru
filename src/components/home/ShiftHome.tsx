@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarDays, Check, Clock, Flame, Sparkles, Target, TrendingUp, X } from "lucide-react";
+import { Check, Clock, Flame, Sparkles, Target, TrendingUp, X } from "lucide-react";
 import type { CoachData, ShiftCard } from "@/lib/server/services/coach";
 import type { DashboardData } from "@/lib/server/services/dashboard";
 import { dayLabel, hours, useAct, useMoney } from "../ui";
@@ -21,62 +21,61 @@ export function timeRange(s: { start: string | null; end: string | null }) {
   return s.start ? `${to12h(s.start)} – ${to12h(s.end)}` : "";
 }
 
-/** The loud one: what your next shift is worth. */
+/** The one big card: what your next shift is worth, and the two ways to answer it. */
 export function NextShiftHero({ c, today, onOpenSchedule }: { c: CoachData; today: string; onOpenSchedule: () => void }) {
   const money = useMoney();
   const { run, pending } = useAct();
   const s = c.nextShift;
   if (!s)
     return (
-      <section className="hero p-6 sm:p-8">
-        <p className="text-sm text-white/80">No shifts coming up</p>
-        <h2 className="mt-1 text-2xl font-semibold sm:text-3xl">Add your schedule and every shift gets a price tag.</h2>
-        <button className="btn btn-white mt-5" onClick={onOpenSchedule}>
-          <CalendarDays size={16} /> Open schedule
+      <section className="hero p-6">
+        <p className="text-sm text-ink-2">No shifts on your calendar yet</p>
+        <p className="mt-1 text-xl font-semibold leading-snug">Add your schedule and every shift shows what it pays.</p>
+        <button className="btn btn-primary mt-5" onClick={onOpenSchedule}>
+          Open schedule
         </button>
       </section>
     );
   const going = s.attendance === "going";
   return (
-    <section className="hero p-6 sm:p-8" aria-label="Next shift">
-      <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-white/85">
-        <span className="inline-flex items-center gap-1.5">
+    <section className="hero p-6" aria-label="Next shift">
+      <div className="flex items-center justify-between gap-3 text-sm">
+        <span className="inline-flex items-center gap-1.5 text-ink-2">
           <Clock size={15} aria-hidden /> {dayLabel(s.date, today)}, {timeRange(s)}
         </span>
-        <span className="rounded-full bg-white/18 px-3 py-1 text-xs font-semibold">{s.jobName}</span>
+        <span className="truncate rounded-full bg-paper-2 px-3 py-1 text-xs font-semibold text-ink">{s.jobName}</span>
       </div>
-      <p className="mt-5 text-sm text-white/80">If you go, you earn</p>
-      <p className="rise figure text-[3.4rem] font-bold leading-none sm:text-7xl">+{money(s.takeHomeCents)}</p>
-      <p className="mt-2 text-sm text-white/80">
-        after {c.taxPercent}% tax ({money(s.grossCents)} gross, {hours(s.minutes)})
+      <p className="mt-6 text-sm text-ink-2">Go, and you earn</p>
+      <p className="rise figure aurora-text mt-1 text-[2.9rem] leading-none sm:text-6xl">+{money(s.takeHomeCents)}</p>
+      <p className="mt-2.5 text-sm text-ink-3">
+        After {c.taxPercent}% tax. {money(s.grossCents)} for {hours(s.minutes)}.
       </p>
-      <div className="mt-6 grid gap-2 text-sm sm:grid-cols-2">
-        {s.payDate && (
-          <div className="rounded-2xl bg-white/14 px-4 py-3 ring-1 ring-white/25">
-            <p className="text-white/75">Lands in your {shortDate(s.payDate)} paycheck</p>
-            <p className="figure text-lg font-semibold">{money(s.paycheckProjectedCents)} projected</p>
-          </div>
-        )}
-        {c.plan.focus && s.daysCloser != null && s.daysCloser > 0 && (
-          <div className="rounded-2xl bg-white/14 px-4 py-3 ring-1 ring-white/25">
-            <p className="text-white/75">Gets {c.plan.focus.name} paid off</p>
-            <p className="text-lg font-semibold">
-              {s.daysCloser} day{s.daysCloser === 1 ? "" : "s"} sooner
-            </p>
-          </div>
-        )}
-      </div>
-      <div className="mt-6 flex flex-wrap gap-2">
+
+      <dl className="mt-6 grid grid-cols-2 border-t border-line pt-4 text-sm">
+        <div className="pr-4">
+          <dt className="text-ink-3">{s.payDate ? `${shortDate(s.payDate)} paycheck` : "Next paycheck"}</dt>
+          <dd className="figure mt-0.5 text-base">{money(s.paycheckProjectedCents)}</dd>
+        </div>
+        <div className="border-l border-line pl-4">
+          <dt className="text-ink-3">{c.plan.focus ? `${c.plan.focus.name} paid off` : "Goal"}</dt>
+          <dd className="mt-0.5 text-base font-semibold">{c.plan.focus && s.daysCloser != null && s.daysCloser > 0 ? `${s.daysCloser} day${s.daysCloser === 1 ? "" : "s"} sooner` : "Tell Haru a goal"}</dd>
+        </div>
+      </dl>
+
+      <div className="mt-5 flex gap-2">
         {going ? (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-sm font-semibold text-violet">
-            <Check size={16} /> You're going. Let's get it.
-          </span>
+          <p className="inline-flex items-center gap-2 text-sm font-semibold text-iris">
+            <span className="grid h-7 w-7 place-items-center rounded-full bg-violet-soft">
+              <Check size={15} />
+            </span>
+            You're going. Haru will check in when it ends.
+          </p>
         ) : (
           <>
-            <button className="btn btn-white" disabled={pending} onClick={() => run("setAttendance", { shift_id: s.id, going: true })}>
+            <button className="btn btn-primary flex-1" disabled={pending} onClick={() => run("setAttendance", { shift_id: s.id, going: true })}>
               <Check size={16} /> I'm going
             </button>
-            <button className="btn btn-ghost-white" disabled={pending} onClick={() => confirm(`Skip this shift? That's ${money(s.takeHomeCents)} you won't earn.`) && run("setAttendance", { shift_id: s.id, going: false })}>
+            <button className="btn btn-line" disabled={pending} onClick={() => confirm(`Skip this shift? That's ${money(s.takeHomeCents)} you won't earn.`) && run("setAttendance", { shift_id: s.id, going: false })}>
               Can't make it
             </button>
           </>
@@ -110,30 +109,32 @@ export function CheckoutCard({ s, today, taxPercent, autoFocus = false }: { s: S
         {s.jobName}, {dayLabel(s.date, today).toLowerCase() === "yesterday" ? "yesterday" : dayLabel(s.date, today)} {timeRange(s)}
       </p>
       <h3 className="mt-0.5 text-lg font-semibold">Did you finish this shift?</h3>
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="mt-4 grid gap-2 sm:flex">
         <button className="btn btn-primary" disabled={pending} onClick={() => run("checkoutShift", { shift_id: s.id, full: true })}>
           <Check size={16} /> Full shift, +{money(s.takeHomeCents)}
         </button>
-        <button className="btn btn-line" aria-expanded={partial} onClick={() => setPartial(!partial)}>
-          Fewer hours
-        </button>
-        <button className="btn btn-quiet" disabled={pending} onClick={() => run("checkoutShift", { shift_id: s.id, missed: true })}>
-          <X size={16} /> Missed it
-        </button>
+        <div className="flex gap-2">
+          <button className="btn btn-line flex-1" aria-expanded={partial} onClick={() => setPartial(!partial)}>
+            Fewer hours
+          </button>
+          <button className="btn btn-quiet flex-1" disabled={pending} onClick={() => run("checkoutShift", { shift_id: s.id, missed: true })}>
+            <X size={16} /> Missed it
+          </button>
+        </div>
       </div>
       {partial && (
         <form
-          className="mt-4 flex flex-wrap items-end gap-3"
+          className="mt-4 flex items-end gap-3"
           onSubmit={(e) => {
             e.preventDefault();
             run("checkoutShift", { shift_id: s.id, hours: Number(h) });
           }}
         >
-          <label className="field w-36">
+          <label className="field w-32">
             Hours worked
             <input className="input" inputMode="decimal" autoFocus value={h} onChange={(e) => setH(e.target.value)} placeholder={String(s.minutes / 60)} />
           </label>
-          <button className="btn btn-primary" disabled={pending || !(Number(h) > 0)}>
+          <button className="btn btn-primary flex-1" disabled={pending || !(Number(h) > 0)}>
             Save{est != null ? `, +${money(est)}` : ""}
           </button>
         </form>
@@ -142,24 +143,24 @@ export function CheckoutCard({ s, today, taxPercent, autoFocus = false }: { s: S
   );
 }
 
+/** Four numbers in one strip: how the month is going. */
 export function StatTiles({ c }: { c: CoachData }) {
   const money = useMoney();
   const rate = c.stats.attendanceRate;
   const tiles = [
-    { icon: TrendingUp, label: "Earned this month", value: money(c.stats.monthTakeHomeCents), note: "after tax" },
-    { icon: Flame, label: "Shift streak", value: String(c.stats.streak), note: c.stats.streak === 1 ? "shift in a row" : "shifts in a row" },
-    { icon: Check, label: "Showed up", value: rate == null ? "—" : `${Math.round(rate * 100)}%`, note: "last 30 days" },
-    { icon: Target, label: "Left on the table", value: money(c.stats.missedTakeHomeCents), note: `${c.stats.missedShifts} missed shift${c.stats.missedShifts === 1 ? "" : "s"}` },
+    { icon: TrendingUp, label: "Earned this month", value: money(c.stats.monthTakeHomeCents) },
+    { icon: Flame, label: c.stats.streak === 1 ? "Shift in a row" : "Shifts in a row", value: String(c.stats.streak) },
+    { icon: Check, label: "Showed up, 30 days", value: rate == null ? "–" : `${Math.round(rate * 100)}%` },
+    { icon: Target, label: `Missed (${c.stats.missedShifts})`, value: money(c.stats.missedTakeHomeCents) },
   ];
   return (
-    <section aria-label="Your numbers" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <section aria-label="Your numbers" className="glass grid grid-cols-2 gap-px overflow-hidden p-0 sm:grid-cols-4">
       {tiles.map((t) => (
-        <div key={t.label} className="glass p-4">
-          <p className="flex items-center gap-1.5 text-xs font-medium text-ink-2">
-            <t.icon size={14} className="text-violet" aria-hidden /> {t.label}
+        <div key={t.label} className="bg-white/40 px-4 py-3.5">
+          <p className="flex items-center gap-1.5 text-xs text-ink-2">
+            <t.icon size={13} className="text-iris" aria-hidden /> {t.label}
           </p>
-          <p className="figure mt-2 text-2xl font-bold">{t.value}</p>
-          <p className="text-xs text-ink-3">{t.note}</p>
+          <p className="figure mt-1.5 text-xl">{t.value}</p>
         </div>
       ))}
     </section>
@@ -167,63 +168,58 @@ export function StatTiles({ c }: { c: CoachData }) {
 }
 
 function Ring({ pct, children }: { pct: number; children: React.ReactNode }) {
-  const r = 34;
+  const r = 30;
   const c = 2 * Math.PI * r;
   const v = Math.max(0, Math.min(1, pct));
   return (
-    <div className="relative h-24 w-24 shrink-0">
-      <svg viewBox="0 0 80 80" className="h-full w-full -rotate-90" aria-hidden>
+    <div className="relative h-[4.6rem] w-[4.6rem] shrink-0">
+      <svg viewBox="0 0 72 72" className="h-full w-full -rotate-90" aria-hidden>
         <defs>
-          <linearGradient id="ring-g" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stopColor="#7c3aed" />
-            <stop offset="1" stopColor="#c084fc" />
+          <linearGradient id="ring-aurora" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#6e56ff" />
+            <stop offset="0.6" stopColor="#2bc8e8" />
+            <stop offset="1" stopColor="#ff6fb5" />
           </linearGradient>
         </defs>
-        <circle cx="40" cy="40" r={r} fill="none" stroke="rgb(124 58 237 / 0.12)" strokeWidth="8" />
-        <circle cx="40" cy="40" r={r} fill="none" stroke="url(#ring-g)" strokeWidth="8" strokeLinecap="round" strokeDasharray={`${c * v} ${c}`} />
+        <circle cx="36" cy="36" r={r} fill="none" stroke="rgb(18 20 43 / 0.07)" strokeWidth="6" />
+        <circle cx="36" cy="36" r={r} fill="none" stroke="url(#ring-aurora)" strokeWidth="6" strokeLinecap="round" strokeDasharray={`${Math.max(c * v, 0.01)} ${c}`} />
       </svg>
       <div className="absolute inset-0 grid place-items-center text-center">{children}</div>
     </div>
   );
 }
 
-/** Each job's next paycheck: logged so far vs. what the schedule adds. */
+/** Each job's next paycheck: logged so far vs. what the schedule adds. Swipe sideways on a phone. */
 export function PaycheckCards({ paydays, taxPercent, today, onOpenRecords }: { paydays: DashboardData["paydays"]; taxPercent: number; today: string; onOpenRecords: (t?: string) => void }) {
   const money = useMoney();
   if (!paydays.length) return null;
   const net = (c?: number) => (c == null ? 0 : Math.round(c * (1 - taxPercent / 100)));
   return (
     <section aria-labelledby="pay-h">
-      <h2 id="pay-h" className="section-title mb-3">
-        Your next paychecks
+      <h2 id="pay-h" className="section-title mb-2.5 px-1">
+        Paychecks
       </h2>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-2">
         {paydays.map((p) =>
           p.configured ? (
-            <div key={p.jobId} className="glass flex items-center gap-4 p-5">
+            <div key={p.jobId} className="glass flex w-[82%] max-w-sm shrink-0 snap-start items-center gap-4 p-4 sm:w-auto sm:flex-1">
               <Ring pct={(p.expectedGrossCents ?? 0) ? (p.loggedGrossCents ?? 0) / (p.expectedGrossCents ?? 1) : 0}>
-                <span className="text-[0.65rem] leading-tight text-ink-3">
-                  in
-                  <br />
-                  <span className="text-lg font-bold text-ink">{p.daysUntil ?? 0}</span>
-                  <br />
-                  day{p.daysUntil === 1 ? "" : "s"}
+                <span className="leading-none">
+                  <span className="figure block text-lg">{p.daysUntil ?? 0}</span>
+                  <span className="text-[0.65rem] text-ink-3">day{p.daysUntil === 1 ? "" : "s"}</span>
                 </span>
               </Ring>
               <div className="min-w-0">
-                <p className="truncate font-semibold">{p.jobName}</p>
-                <p className="text-sm text-ink-2">Payday {dayLabel(p.payDate!, today)}</p>
-                <p className="figure mt-1 text-2xl font-bold text-violet">{money(net(p.expectedGrossCents))}</p>
-                <p className="text-xs text-ink-3">
-                  {money(net(p.loggedGrossCents))} earned so far
-                  {p.scheduledGrossCents ? `, +${money(net(p.scheduledGrossCents))} if you work your shifts` : ""}
-                </p>
+                <p className="truncate text-sm font-semibold">{p.jobName}</p>
+                <p className="text-xs text-ink-3">Payday {dayLabel(p.payDate!, today)}</p>
+                <p className="figure mt-1.5 text-xl">{money(net(p.expectedGrossCents))}</p>
+                <p className="text-xs text-ink-2">{money(net(p.loggedGrossCents))} earned so far</p>
               </div>
             </div>
           ) : (
-            <button key={p.jobId} className="glass p-5 text-left" onClick={() => onOpenRecords("jobs")}>
-              <p className="font-semibold">{p.jobName}</p>
-              <p className="text-sm text-ink-2">Set your paydays so HARU can count toward them.</p>
+            <button key={p.jobId} className="glass w-[82%] max-w-sm shrink-0 snap-start p-4 text-left sm:w-auto sm:flex-1" onClick={() => onOpenRecords("jobs")}>
+              <p className="text-sm font-semibold">{p.jobName}</p>
+              <p className="mt-1 text-sm text-ink-2">Set the paydays so Haru can count toward them.</p>
             </button>
           ),
         )}
@@ -232,51 +228,53 @@ export function PaycheckCards({ paydays, taxPercent, today, onOpenRecords }: { p
   );
 }
 
-/** What to pay first, and when you're done. */
+/** What to pay first, and when you're done. A sequence, so it's numbered. */
 export function PayoffPlanCard({ c, onAsk }: { c: CoachData; onAsk: (t: string) => void }) {
   const money = useMoney();
   const p = c.plan;
   if (!p.items.length && !p.warnings.length) return null;
   return (
-    <section aria-labelledby="plan-h" className="glass p-5 sm:p-6">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id="plan-h" className="section-title">
-          Your payoff plan
-        </h2>
+    <section aria-labelledby="plan-h" className="glass p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 id="plan-h" className="section-title">
+            Payoff plan
+          </h2>
+          <p className="mt-0.5 text-sm text-ink-2">
+            <span className={`figure ${p.surplusCents > 0 ? "text-iris" : "text-brick"}`}>{money(p.surplusCents)}</span> free each month after bills and minimums
+          </p>
+        </div>
         {p.debtFreeDate && (
-          <span className="chip chip-moss">
-            <Sparkles size={12} /> Debt-free {shortDate(p.debtFreeDate)} {p.debtFreeDate.slice(0, 4)}
-          </span>
+          <div className="shrink-0 text-right">
+            <p className="text-xs text-ink-3">Debt-free</p>
+            <p className="figure aurora-text text-base">
+              {shortDate(p.debtFreeDate)} {p.debtFreeDate.slice(2, 4) === new Date().getFullYear().toString().slice(2) ? "" : `’${p.debtFreeDate.slice(2, 4)}`}
+            </p>
+          </div>
         )}
       </div>
-      <p className="mt-1 text-sm text-ink-2">
-        Your schedule brings in about <strong className="text-ink">{money(p.monthlyTakeHomeCents)}</strong> a month after tax. After bills ({money(p.monthlyBillsCents)})
-        {p.monthlyMinimumsCents ? ` and minimum payments (${money(p.monthlyMinimumsCents)})` : ""}, <strong className={p.surplusCents > 0 ? "text-violet" : "text-brick"}>{money(p.surplusCents)}</strong> is free each month.
-      </p>
       {p.warnings.map((w) => (
         <p key={w} className="mt-3 rounded-2xl bg-amber-soft px-4 py-2.5 text-sm text-ink">
           {w}
         </p>
       ))}
-      <ol className="mt-4 grid gap-2">
+      <ol className="mt-4 grid gap-1">
         {p.items.map((it, i) => (
-          <li key={it.id} className={`flex items-center gap-3 rounded-2xl px-4 py-3 ${i === 0 ? "bg-violet-soft ring-1 ring-violet/25" : "bg-white/50"}`}>
-            <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-bold ${i === 0 ? "bg-violet text-white" : "bg-white text-ink-2"}`}>{i + 1}</span>
+          <li key={it.id} className={`flex items-center gap-3 rounded-2xl px-3 py-2.5 ${i === 0 ? "bg-violet-soft" : ""}`}>
+            <span className={`figure grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs ${i === 0 ? "bg-ink text-white" : "bg-paper-2 text-ink-2"}`}>{i + 1}</span>
             <div className="min-w-0 flex-1">
-              <p className="font-semibold">
-                {it.name} {i === 0 && <span className="ml-1 text-xs font-medium text-violet">focus here</span>}
-              </p>
-              <p className="text-xs text-ink-3">{it.reason}</p>
+              <p className="truncate text-sm font-semibold">{it.name}</p>
+              <p className="truncate text-xs text-ink-3">{i === 0 ? "Put every extra dollar here" : it.reason}</p>
             </div>
             <div className="text-right">
-              <p className="figure font-semibold">{money(it.remainingCents)}</p>
-              <p className="text-xs text-ink-3">{it.finishDate ? `done ${shortDate(it.finishDate)} ${it.finishDate.slice(0, 4)}` : "needs more shifts"}</p>
+              <p className="figure text-sm">{money(it.remainingCents)}</p>
+              <p className="text-xs text-ink-3">{it.finishDate ? `done ${shortDate(it.finishDate)}` : "needs more shifts"}</p>
             </div>
           </li>
         ))}
       </ol>
-      <button className="btn btn-quiet mt-3 px-0 text-sm text-violet" onClick={() => onAsk("How can I pay off my debt faster?")}>
-        Ask HARU how to get there faster
+      <button className="btn btn-quiet mt-2 px-2 text-sm text-iris" onClick={() => onAsk("How can I pay this off faster?")}>
+        <Sparkles size={15} /> Ask Haru how to get there faster
       </button>
     </section>
   );
@@ -292,33 +290,36 @@ export function WeekStrip({ c, today, onOpenSchedule }: { c: CoachData; today: s
   });
   const total = c.week.filter((s) => s.attendance !== "not_going").reduce((a, s) => a + s.takeHomeCents, 0);
   return (
-    <section aria-labelledby="week-h" className="glass p-5">
-      <div className="flex items-baseline justify-between gap-2">
+    <section aria-labelledby="week-h">
+      <div className="mb-2.5 flex items-baseline justify-between gap-2 px-1">
         <h2 id="week-h" className="section-title">
-          This week
+          Next 7 days
         </h2>
-        <button className="text-sm font-semibold text-violet" onClick={onOpenSchedule}>
-          Schedule
-        </button>
+        <p className="text-sm text-ink-2">
+          <span className="figure text-ink">{money(total)}</span> if you work them all
+        </p>
       </div>
-      <p className="text-sm text-ink-2">
-        Work every shift and you take home <strong className="text-violet">{money(total)}</strong>.
-      </p>
-      <div className="scroll-thin -mx-1 mt-4 flex gap-2 overflow-x-auto px-1 pb-1">
+      <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
         {days.map((d) => {
           const list = c.week.filter((s) => s.date === d);
+          const isToday = d === today;
           return (
-            <button key={d} onClick={onOpenSchedule} className={`min-w-[5.6rem] flex-1 rounded-2xl px-3 py-3 text-left ${list.length ? "bg-white/75 ring-1 ring-violet/15" : "bg-white/35"}`}>
-              <p className="text-xs font-semibold text-ink-3">{d === today ? "Today" : new Date(`${d}T12:00:00Z`).toLocaleDateString("en-CA", { weekday: "short", timeZone: "UTC" })}</p>
+            <button
+              key={d}
+              onClick={onOpenSchedule}
+              className={`min-w-[4.9rem] flex-1 rounded-[20px] px-3 py-3 text-left transition ${list.length ? "glass" : "border border-dashed border-line"} ${isToday ? "ring-2 ring-iris/40" : ""}`}
+            >
+              <p className={`text-xs font-semibold ${isToday ? "text-iris" : "text-ink-3"}`}>{isToday ? "Today" : new Date(`${d}T12:00:00Z`).toLocaleDateString("en-CA", { weekday: "short", timeZone: "UTC" })}</p>
+              <p className="text-[0.7rem] text-ink-3">{shortDate(d)}</p>
               {list.length ? (
                 list.map((s) => (
-                  <p key={s.id} className={`mt-1 text-sm ${s.attendance === "not_going" ? "text-ink-3 line-through" : ""}`}>
-                    <span className="figure block font-bold text-violet">+{money(s.takeHomeCents)}</span>
-                    <span className="block truncate text-xs text-ink-2">{to12h(s.start)}</span>
+                  <p key={s.id} className={`mt-2 ${s.attendance === "not_going" ? "text-ink-3 line-through" : ""}`}>
+                    <span className="figure block text-sm">+{money(s.takeHomeCents)}</span>
+                    <span className="block truncate text-[0.7rem] text-ink-2">{to12h(s.start)}</span>
                   </p>
                 ))
               ) : (
-                <p className="mt-1 text-xs text-ink-3">Off</p>
+                <p className="mt-2 text-xs text-ink-3">Off</p>
               )}
             </button>
           );

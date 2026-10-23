@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { AlertCircle, BellRing, CalendarClock, Check, ChevronDown, Sparkles, X } from "lucide-react";
+import { AlertCircle, BellRing, Check, Minus, Sparkles, X } from "lucide-react";
 import type { DashboardData } from "@/lib/server/services/dashboard";
-import type { ComponentKey } from "@/lib/dashboard-registry";
-import { cancelReminderAction, observationAction, resetDashboardLayout } from "@/app/actions";
+import { CARDS, type CardKey } from "@/lib/dashboard-registry";
+import { cancelReminderAction, editCards, observationAction } from "@/app/actions";
+import { AuroraOrb } from "../AuroraOrb";
 import { MoneyBar } from "./MoneyBar";
 import { EarningsChart, SpendingChart } from "./Charts";
 import { CheckoutCards, NextShiftHero, PaycheckCards, PayoffPlanCard, StatTiles, WeekStrip } from "../home/ShiftHome";
@@ -16,14 +17,13 @@ export interface DashboardProps {
   onAsk: (text: string) => void;
   onOpenRecords: (tab?: string) => void;
   onOpenSchedule: () => void;
+  /** Cards Haru just added, so they can shimmer in once. */
+  fresh?: CardKey[];
 }
-
-// These live in the shift-first block at the top, so the ordered list skips them.
-const SHOWN_ABOVE = new Set<ComponentKey>(["paydays", "upcoming_work", "goals", "debts"]);
 
 function Section({ id, title, aside, children }: { id: string; title: string; aside?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section aria-labelledby={`${id}-h`} className="glass p-5 sm:p-6">
+    <section aria-labelledby={`${id}-h`} className="glass p-5">
       <div className="mb-3 flex items-baseline justify-between gap-3">
         <h2 id={`${id}-h`} className="section-title">
           {title}
@@ -35,25 +35,29 @@ function Section({ id, title, aside, children }: { id: string; title: string; as
   );
 }
 
-export function Dashboard({ data, onAsk, onOpenRecords, onOpenSchedule }: DashboardProps) {
+export function Dashboard({ data, onAsk, onOpenRecords, onOpenSchedule, fresh = [] }: DashboardProps) {
   const money = useMoney();
   const { run, pending } = useAct();
   const toast = useToast();
   const router = useRouter();
+  const [editing, setEditing] = useState(false);
   const t = data.today;
-  const custom = data.layout.length > 0;
+  const c = data.coach;
 
-  const render: Record<ComponentKey, () => React.ReactNode> = {
-    attention: () => (
-      <AttentionList items={data.attention} onAsk={onAsk} />
-    ),
-    position: () => <MoneyBar p={data.position} today={t} onSetBalance={() => onOpenRecords("money")} />,
+  // Each card renders its content, or null when it has nothing real to show yet.
+  const render: Record<CardKey, () => React.ReactNode> = {
+    next_shift: () => <NextShiftHero c={c} today={t} onOpenSchedule={onOpenSchedule} />,
+    paychecks: () => (data.paydays.length ? <PaycheckCards paydays={data.paydays} taxPercent={c.taxPercent} today={t} onOpenRecords={onOpenRecords} /> : null),
+    week: () => <WeekStrip c={c} today={t} onOpenSchedule={onOpenSchedule} />,
+    stats: () => <StatTiles c={c} />,
+    payoff: () => <PayoffPlanCard c={c} onAsk={onAsk} />,
+    money: () => <MoneyBar p={data.position} today={t} onSetBalance={() => onOpenRecords("money")} />,
 
     earnings: () => (
       <section aria-labelledby="earn-h" className="glass p-5 sm:p-6">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 id="earn-h" className="section-title">
-            What you took home
+            Take-home
           </h2>
           <span className="text-xs text-ink-3">after {data.reservePercent}% tax, from logged shifts</span>
         </div>
@@ -81,92 +85,9 @@ export function Dashboard({ data, onAsk, onOpenRecords, onOpenSchedule }: Dashbo
       </section>
     ),
 
-    paydays: () => (
-      <Section id="pay" title="Next paydays" aside={<span className="text-xs text-ink-3">Estimates from your payroll rules</span>}>
-        <ul className="grid gap-2">
-          {data.paydays.map((p) =>
-            p.configured ? (
-              <li key={p.jobId}>
-                <details className="group rounded-2xl bg-surface px-4 py-3 ring-1 ring-line">
-                  <summary className="flex cursor-pointer list-none items-center gap-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold">{p.jobName}</p>
-                      <p className="text-sm text-ink-2">
-                        {dayLabel(p.payDate!, t)}
-                        {p.daysUntil != null && p.daysUntil > 1 ? ` (in ${p.daysUntil} days)` : ""}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="figure text-lg font-semibold">{money(p.expectedGrossCents)}</p>
-                      <p className="text-xs text-ink-3">{p.expectedNetCents != null ? `≈ ${money(p.expectedNetCents)} after your deductions` : "gross"}</p>
-                    </div>
-                    <ChevronDown size={16} className="text-ink-3 transition group-open:rotate-180" aria-hidden />
-                  </summary>
-                  <div className="mt-3 grid gap-1 border-t border-line pt-3 text-sm">
-                    <Row k={`Logged hours (${p.periodStart} to ${p.periodEnd})`} v={money(p.loggedGrossCents)} />
-                    {!!p.scheduledGrossCents && <Row k="Scheduled, not yet worked" v={money(p.scheduledGrossCents)} dashed />}
-                    <Row k={`Reserve estimate (${data.reservePercent}%) — planning only`} v={money(p.reserveCents)} />
-                    <ul className="mt-2 list-disc space-y-0.5 pl-5 text-xs text-ink-3">
-                      {p.uncertainty?.map((u) => <li key={u}>{u}</li>)}
-                    </ul>
-                  </div>
-                </details>
-              </li>
-            ) : (
-              <li key={p.jobId} className="flex items-center justify-between gap-3 rounded-2xl bg-surface px-4 py-3 ring-1 ring-line">
-                <div>
-                  <p className="font-semibold">{p.jobName}</p>
-                  <p className="text-sm text-ink-3">Pay schedule not set, so HARU can't predict paydays.</p>
-                </div>
-                <button className="btn btn-line text-xs" onClick={() => onOpenRecords("jobs")}>
-                  Set pay schedule
-                </button>
-              </li>
-            ),
-          )}
-        </ul>
-      </Section>
-    ),
-
-    upcoming_work: () => {
-      const opps = data.opportunities.filter((o) => o.status === "accepted" || o.status === "scheduled");
-      return (
-        <Section id="work" title="Upcoming work">
-          <ul className="divide-y divide-line">
-            {data.upcomingShifts.map((s) => (
-              <li key={s.id} className="flex items-center gap-3 py-2.5">
-                <CalendarClock size={16} className="shrink-0 text-ink-3" aria-hidden />
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium">{s.jobName}</p>
-                  <p className="text-sm text-ink-2">
-                    {dayLabel(s.date, t)}
-                    {s.start ? `, ${s.start}–${s.end}` : ""}, {hours(s.minutes)}
-                  </p>
-                </div>
-                <span className="figure text-sm text-ink-2">{money(s.grossCents)} expected</span>
-              </li>
-            ))}
-            {opps.map((o) => (
-              <li key={o.id} className="flex items-center gap-3 py-2.5">
-                <Sparkles size={16} className="shrink-0 text-goal" aria-hidden />
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium">
-                    {o.name} <span className="chip chip-goal ml-1">one-time</span>
-                  </p>
-                  <p className="text-sm text-ink-2">{o.date ? dayLabel(o.date, t) : "Date not set"}</p>
-                </div>
-                <button className="btn btn-line text-xs" disabled={pending || (o.date != null && o.date > t)} onClick={() => run("updateOpportunity", { opportunity_id: o.id, status: "completed" })} title={o.date && o.date > t ? "Available once the day arrives" : undefined}>
-                  Mark done
-                </button>
-              </li>
-            ))}
-          </ul>
-        </Section>
-      );
-    },
-
-    opportunities: () => (
-      <Section id="opp" title="One-time work">
+    opportunities: () =>
+      !data.opportunities.some((o) => o.status === "considering" || (o.status === "completed" && !o.paid)) ? null : (
+      <Section id="opp" title="Extra work">
         <ul className="grid gap-2">
           {data.opportunities
             .filter((o) => o.status === "considering" || (o.status === "completed" && !o.paid))
@@ -177,7 +98,8 @@ export function Dashboard({ data, onAsk, onOpenRecords, onOpenSchedule }: Dashbo
       </Section>
     ),
 
-    bills: () => (
+    bills: () =>
+      !data.bills.length ? null : (
       <Section id="bills" title="Bills" aside={<button className="text-xs text-ink-2 underline underline-offset-4" onClick={() => onOpenRecords("bills")}>All bills</button>}>
         <ul className="divide-y divide-line">
           {data.bills.slice(0, 6).map((b) => (
@@ -201,8 +123,9 @@ export function Dashboard({ data, onAsk, onOpenRecords, onOpenSchedule }: Dashbo
       </Section>
     ),
 
-    goals: () => (
-      <Section id="goals" title="Savings goals" aside={<span className="text-xs text-ink-3">Money set aside from your cash</span>}>
+    goals: () =>
+      !data.goals.length ? null : (
+      <Section id="goals" title="Goals" aside={<span className="text-xs text-ink-3">Money set aside from your cash</span>}>
         <ul className="grid gap-4">
           {data.goals.map((g) => (
             <GoalRow key={g.id} g={g} today={t} />
@@ -211,8 +134,9 @@ export function Dashboard({ data, onAsk, onOpenRecords, onOpenSchedule }: Dashbo
       </Section>
     ),
 
-    debts: () => (
-      <Section id="debts" title="Debt">
+    debts: () =>
+      !data.debts.length ? null : (
+      <Section id="debts" title="Debts">
         <ul className="grid gap-4">
           {data.debts.map((d) => (
             <li key={d.id}>
@@ -229,7 +153,8 @@ export function Dashboard({ data, onAsk, onOpenRecords, onOpenSchedule }: Dashbo
       </Section>
     ),
 
-    spending: () => (
+    spending: () =>
+      !data.spending.weekly.some((w) => w.cents > 0) ? null : (
       <Section id="spend" title="Spending" aside={<span className="figure text-sm text-ink-2">{money(data.spending.monthCents)} this month</span>}>
         <SpendingChart weekly={data.spending.weekly} />
         {data.spending.topCategories.length > 0 && (
@@ -244,7 +169,8 @@ export function Dashboard({ data, onAsk, onOpenRecords, onOpenSchedule }: Dashbo
       </Section>
     ),
 
-    reminders: () => (
+    reminders: () =>
+      !data.reminders.length ? null : (
       <Section id="rem" title="Reminders">
         <ul className="divide-y divide-line">
           {data.reminders.map((r) => (
@@ -271,7 +197,8 @@ export function Dashboard({ data, onAsk, onOpenRecords, onOpenSchedule }: Dashbo
       </Section>
     ),
 
-    insights: () => (
+    insights: () =>
+      !data.insights.length ? null : (
       <Section id="ins" title="Patterns HARU noticed">
         <ul className="grid gap-3">
           {data.insights.map((i) => (
@@ -295,7 +222,8 @@ export function Dashboard({ data, onAsk, onOpenRecords, onOpenSchedule }: Dashbo
       </Section>
     ),
 
-    activity: () => (
+    activity: () =>
+      !data.activity.length ? null : (
       <Section id="act" title="Recent activity">
         <ul className="grid gap-1.5 text-sm">
           {data.activity.map((a) => (
@@ -313,45 +241,59 @@ export function Dashboard({ data, onAsk, onOpenRecords, onOpenSchedule }: Dashbo
   };
 
   const hour = Number(new Date().toLocaleString("en-US", { timeZone: data.tz, hour: "numeric", hourCycle: "h23" }));
-  const greeting = hour < 5 ? "Good night" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const greeting = hour < 5 ? "Still up" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const shown = data.cards.map((k) => ({ k, node: render[k]() })).filter((x) => x.node != null);
 
-  const c = data.coach;
+  async function remove(k: CardKey) {
+    const r = await editCards({ remove: [k] });
+    toast(r.ok ? `Removed ${CARDS[k].title}. Ask Haru to bring it back anytime.` : r.error, r.ok ? "ok" : "error");
+    router.refresh();
+  }
+
   return (
-    <div className="grid gap-5">
-      <div>
-        <h1 className="text-[1.7rem] font-bold tracking-tight sm:text-3xl">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-5">
+      <div className="px-1">
+        <h1 className="text-[1.75rem] font-semibold leading-tight tracking-tight">
           {greeting}
           {data.displayName ? `, ${data.displayName}` : ""}
         </h1>
-        <p className="text-ink-2">{new Date(`${t}T12:00:00Z`).toLocaleDateString("en-CA", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" })}</p>
+        <p className="text-ink-3">{new Date(`${t}T12:00:00Z`).toLocaleDateString("en-CA", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" })}</p>
       </div>
 
-      {data.isEmpty && <FirstSteps onAsk={onAsk} onOpenRecords={onOpenRecords} />}
+      <CheckoutCards items={c.checkouts} today={t} taxPercent={c.taxPercent} />
+      {data.attention.length > 0 && <AttentionList items={data.attention} onAsk={onAsk} />}
 
-      {!data.isEmpty && (
-        <>
-          <CheckoutCards items={c.checkouts} today={t} taxPercent={c.taxPercent} />
-          <NextShiftHero c={c} today={t} onOpenSchedule={onOpenSchedule} />
-          <StatTiles c={c} />
-          <PaycheckCards paydays={data.paydays} taxPercent={c.taxPercent} today={t} onOpenRecords={onOpenRecords} />
-          <PayoffPlanCard c={c} onAsk={onAsk} />
-          <WeekStrip c={c} today={t} onOpenSchedule={onOpenSchedule} />
-        </>
+      {shown.length === 0 ? (
+        <section className="glass grid justify-items-center gap-3 px-6 py-10 text-center">
+          <AuroraOrb size={72} />
+          <p className="text-lg font-semibold">Nothing on your dashboard yet</p>
+          <p className="max-w-xs text-sm text-ink-2">Tell Haru about your jobs, bills and goals. Cards appear here as you talk.</p>
+          <button className="btn btn-primary mt-1" onClick={() => onAsk("")}>
+            Talk to Haru
+          </button>
+        </section>
+      ) : (
+        shown.map(({ k, node }) => (
+          <div key={k} className={`relative ${fresh.includes(k) ? "card-new" : ""}`}>
+            {node}
+            {editing && (
+              <button className="absolute -right-1.5 -top-1.5 z-10 grid h-8 w-8 place-items-center rounded-full bg-ink text-white shadow-lg" onClick={() => remove(k)} aria-label={`Remove ${CARDS[k].title}`}>
+                <Minus size={16} />
+              </button>
+            )}
+          </div>
+        ))
       )}
 
-      {data.order
-        .filter((k) => !SHOWN_ABOVE.has(k))
-        .map((k) => (
-          <div key={k}>{render[k]()}</div>
-        ))}
-
-      {custom && (
-        <p className="text-xs text-ink-3">
-          You've customised this layout.{" "}
-          <button className="underline underline-offset-4" onClick={async () => { await resetDashboardLayout(); router.refresh(); }}>
-            Let HARU arrange it again
+      {shown.length > 0 && (
+        <div className="flex items-center justify-center gap-4 pt-2 text-sm text-ink-3">
+          <button className="underline-offset-4 hover:underline" onClick={() => setEditing(!editing)}>
+            {editing ? "Done" : "Edit dashboard"}
           </button>
-        </p>
+          <button className="inline-flex items-center gap-1 underline-offset-4 hover:underline" onClick={() => onAsk("Change my dashboard: ")}>
+            <Sparkles size={13} /> Ask Haru to change it
+          </button>
+        </div>
       )}
     </div>
   );
@@ -383,15 +325,6 @@ function AttentionList({ items, onAsk }: { items: DashboardData["attention"]; on
         </button>
       )}
     </section>
-  );
-}
-
-function Row({ k, v, dashed }: { k: string; v: string; dashed?: boolean }) {
-  return (
-    <div className="flex justify-between gap-3">
-      <span className={dashed ? "text-slate" : "text-ink-2"}>{k}</span>
-      <span className="figure font-medium">{v}</span>
-    </div>
   );
 }
 
@@ -498,25 +431,5 @@ function GoalRow({ g, today }: { g: DashboardData["goals"][number]; today: strin
         </form>
       )}
     </li>
-  );
-}
-
-function FirstSteps({ onAsk, onOpenRecords }: { onAsk: (t: string) => void; onOpenRecords: (tab?: string) => void }) {
-  const prompts = ["I work at Northgate Security for $20/h, paid every two weeks", "I have $850 in my chequing account", "My phone bill is $115 due on the 25th", "I want to save $5,000"];
-  return (
-    <section className="panel p-5 sm:p-6">
-      <h2 className="text-lg font-semibold">Tell HARU about your work and money</h2>
-      <p className="mt-1 max-w-[60ch] text-ink-2">Type it the way you'd say it. Nothing appears here until you add it — HARU never fills your dashboard with made-up numbers.</p>
-      <div className="mt-4 flex flex-wrap gap-2">
-        {prompts.map((p) => (
-          <button key={p} className="btn btn-line text-left text-sm font-normal" onClick={() => onAsk(p)}>
-            {p}
-          </button>
-        ))}
-      </div>
-      <button className="btn btn-quiet mt-3 px-0 text-sm underline underline-offset-4" onClick={() => onOpenRecords("jobs")}>
-        Or add things with forms
-      </button>
-    </section>
   );
 }

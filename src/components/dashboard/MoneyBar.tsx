@@ -25,23 +25,23 @@ export function MoneyBar({ p, today, onSetBalance }: { p: DashboardData["positio
   const goalsIn = Math.min(goals, Math.max(0, cash - resIn));
 
   return (
-    <section aria-labelledby="money-h" className="panel p-5 sm:p-6">
+    <section aria-labelledby="money-h" className="glass p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h2 id="money-h" className="section-title">
           Cash you have
         </h2>
         {p.hasAccounts ? (
-          <span className="text-xs text-ink-3">Tracked in HARU — not a live bank feed</span>
+          <span className="text-xs text-ink-3">Tracked in Haru, not a bank feed</span>
         ) : null}
       </div>
-      <p className={`figure mt-1 text-[2.6rem] font-[650] leading-none sm:text-5xl ${p.cashCents < 0 ? "text-brick" : ""}`}>{money(p.cashCents)}</p>
+      <p className={`figure mt-2 text-[2.3rem] leading-none sm:text-5xl ${p.cashCents < 0 ? "text-brick" : ""}`}>{money(p.cashCents)}</p>
       {!p.balanceConfirmed && (
         <button onClick={onSetBalance} className="mt-2 text-left text-sm text-amber underline decoration-dotted underline-offset-4">
           {p.hasAccounts ? "Some balances haven't been confirmed — set what's really in your accounts" : "Add your account balance so this number is real"}
         </button>
       )}
 
-      <div className="mt-5 flex h-7 w-full overflow-hidden rounded-lg" aria-hidden="true">
+      <div className="mt-5 flex h-3.5 w-full gap-0.5 overflow-hidden rounded-full" aria-hidden="true">
         {resIn > 0 && <div className="bar-grow h-full bg-amber" style={{ width: w(resIn) }} />}
         {goalsIn > 0 && <div className="bar-grow h-full bg-goal" style={{ width: w(goalsIn) }} />}
         {safe > 0 && <div className="bar-grow h-full bg-moss" style={{ width: w(safe) }} />}
@@ -72,7 +72,7 @@ function Stat({ label, value, dot, dashed, strong, tone }: { label: string; valu
         {dashed && <span className={`inline-block h-2.5 w-2.5 rounded-sm ${dashed}`} style={{ borderWidth: 1 }} />}
         {label}
       </dt>
-      <dd className={`figure mt-0.5 ${strong ? "text-xl font-[650]" : "text-lg font-semibold"} ${tone ?? ""}`}>{value}</dd>
+      <dd className={`figure mt-0.5 ${strong ? "text-xl" : "text-base"} ${tone ?? ""}`}>{value}</dd>
     </div>
   );
 }
