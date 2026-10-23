@@ -19,6 +19,8 @@ import { completeOnboarding, updatePrefs } from "@/lib/server/services/prefs";
 import { checkoutShift, setAttendance, takeHome } from "@/lib/server/services/shiftloop";
 import { setObservationStatus } from "@/lib/server/services/observations";
 import type { Ctx } from "@/lib/server/context";
+import { autoPlace, changeCards } from "@/lib/server/services/cards";
+import { isCardKey } from "@/lib/dashboard-registry";
 import type { ServiceResult } from "@/lib/server/services/jobs";
 
 export type ActionResult = { ok: true; summary: string } | { ok: false; error: string };
@@ -62,6 +64,7 @@ export async function act(kind: ActionKind, input: unknown): Promise<ActionResul
     const parsed = def.schema.safeParse(input);
     if (!parsed.success) return { ok: false, error: parsed.error.issues.map((i) => `${i.path.join(".") || "input"}: ${i.message}`).join("; ") };
     const res = (await (def.run as (c: Ctx, a: unknown) => Promise<ServiceResult>)(ctx, parsed.data)) as ServiceResult;
+    await autoPlace(ctx, kind).catch((e) => logError("cards.autoPlace", e));
     revalidatePath("/");
     return { ok: true, summary: res.summary };
   } catch (e) {
@@ -94,15 +97,18 @@ export async function cancelReminderAction(id: string) {
 export async function observationAction(id: string, status: "dismissed" | "accepted") {
   return simple((ctx) => (V.zId.safeParse(id).success && ["dismissed", "accepted"].includes(status) ? setObservationStatus(ctx, id, status) : Promise.reject(new AppError("Invalid"))));
 }
-export async function resetDashboardLayout() {
-  return simple(async (ctx) => {
-    await sql`update dashboard_preferences set previous_layout = layout, layout = '[]'::jsonb, updated_at = now() where user_id = ${ctx.userId}`;
-  });
-}
-export async function undoDashboardLayout() {
-  return simple(async (ctx) => {
-    await sql`update dashboard_preferences set layout = coalesce(previous_layout, '[]'::jsonb), previous_layout = layout, updated_at = now() where user_id = ${ctx.userId}`;
-  });
+/** The user's own edits to the dashboard HARU built: remove, bring back, or move a card. */
+export async function editCards(input: { add?: string[]; remove?: string[]; order?: string[] }): Promise<ActionResult> {
+  try {
+    const ctx = await requireCtx();
+    const keys = (xs?: string[]) => (xs ?? []).filter(isCardKey);
+    const r = await changeCards(ctx, { add: keys(input.add), remove: keys(input.remove), order: keys(input.order) });
+    revalidatePath("/");
+    return { ok: true, summary: r.summary };
+  } catch (e) {
+    if (!(e instanceof AppError)) logError("action.editCards", e);
+    return { ok: false, error: publicMessage(e) };
+  }
 }
 export async function signOut() {
   const { supabaseServer } = await import("@/lib/server/context");

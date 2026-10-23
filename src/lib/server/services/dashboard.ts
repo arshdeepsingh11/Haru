@@ -6,7 +6,8 @@ import { occurrencesUntil } from "../../domain/recurrence";
 import { addDays, diffDays, friendlyDate, localTime, splitDate, startOfMonth, startOfWeek, endOfMonth } from "../../domain/time";
 import { evaluateOpportunity } from "../../domain/opportunity";
 import { formatMoney } from "../../domain/money";
-import { arrange, isComponentKey, type ComponentKey, type LayoutEntry } from "../../dashboard-registry";
+import type { CardKey } from "../../dashboard-registry";
+import { getCards } from "./cards";
 import { listJobs, jobLabel, payRuleOf } from "./jobs";
 import { listAccounts, listBills } from "./finance";
 import { awaitingPaychecks, forecastAll } from "./payroll";
@@ -54,9 +55,10 @@ export interface DashboardData {
   activity: { id: number; summary: string; actor: string; at: string }[];
   attention: AttentionItem[];
   jobs: { id: string; name: string; rateCents: number | null; hasPayRule: boolean }[];
-  order: ComponentKey[];
-  layout: LayoutEntry[];
+  /** Cards on this user's dashboard, in order. Built by HARU as the conversation goes. */
+  cards: CardKey[];
   isEmpty: boolean;
+  onboarded: boolean;
   coach: CoachData;
 }
 
@@ -77,7 +79,7 @@ export async function getDashboard(ctx: Ctx): Promise<DashboardData> {
     getCoach(ctx),
   ]);
 
-  const [earnRows, oppEarn, spendRows, catRows, upcoming, unpaidShifts, missedShifts, goals, debts, activity, layoutRow, unread] = await Promise.all([
+  const [earnRows, oppEarn, spendRows, catRows, upcoming, unpaidShifts, missedShifts, goals, debts, activity, cardsState, unread] = await Promise.all([
     sql<{ job_id: string; job_name: string; week: string; cents: number; minutes: number; in_month: boolean; in_week: boolean }[]>`
       select s.job_id, j.employer as job_name,
              (s.work_date - ((extract(dow from s.work_date)::int - ${ctx.prefs.week_starts_on} + 7) % 7))::text as week,
@@ -121,7 +123,7 @@ export async function getDashboard(ctx: Ctx): Promise<DashboardData> {
       where user_id = ${ctx.userId} and status = 'active'`,
     sql<{ id: number; summary: string; actor: string; created_at: Date }[]>`
       select id, summary, actor, created_at from activity_log where user_id = ${ctx.userId} and summary is not null order by created_at desc limit 8`,
-    sql<{ layout: LayoutEntry[] }[]>`select layout from dashboard_preferences where user_id = ${ctx.userId}`,
+    getCards(ctx),
     sql<{ n: number }[]>`select count(*)::int as n from reminders where user_id = ${ctx.userId} and status = 'sent' and read_at is null`,
   ]);
 
@@ -165,7 +167,8 @@ export async function getDashboard(ctx: Ctx): Promise<DashboardData> {
   }
 
   // ---------------------------------------------------------------- position
-  const horizonPayday = forecasts.filter((f) => f.period).map((f) => f.period!.payDate).sort()[0];
+  // On payday itself, the money has arrived: plan to the payday after it.
+  const horizonPayday = forecasts.filter((f) => f.period && f.period.payDate > ctx.today).map((f) => f.period!.payDate).sort()[0];
   const horizon = horizonPayday ?? addDays(ctx.today, 14);
   let reserved = 0;
   const billItems: DashboardData["bills"] = [];
@@ -232,27 +235,6 @@ export async function getDashboard(ctx: Ctx): Promise<DashboardData> {
     attention.push({ id: "shortfall", tone: "urgent", title: "Bills exceed your cash", detail: `Bills due before ${fd(horizon)} and goal money total more than your tracked cash by ${m(-position.safeToAllocateCents)}.` });
   attention.sort((a, b) => ["urgent", "warn", "info"].indexOf(a.tone) - ["urgent", "warn", "info"].indexOf(b.tone));
 
-  // ---------------------------------------------------------------- relevance & order
-  const nextPayIn = forecasts.find((f) => f.daysUntil != null)?.daysUntil ?? null;
-  const soonestBill = billItems[0]?.daysUntil ?? null;
-  const scores: Partial<Record<ComponentKey, number | null>> = {
-    attention: attention.length ? 100 : null,
-    // The money panel appears once there's something real in it (no wall of zeros for new users).
-    position: accounts.length || debts.length || goals.length || earnedUnpaid || expectedPaychecks || projectedOpps ? 90 : null,
-    earnings: jobs.length || earnRows.length ? 70 : null,
-    paydays: jobs.length ? (nextPayIn != null && nextPayIn <= 2 ? 88 : 65) : null,
-    upcoming_work: upcoming.length || opps.some((o) => o.status === "accepted" || o.status === "scheduled") ? 75 : null,
-    opportunities: opps.some((o) => o.status === "considering" || (o.status === "completed" && !o.paid)) ? 72 : null,
-    bills: billItems.length ? (soonestBill != null && soonestBill <= 2 ? 86 : 60) : null,
-    goals: goals.length ? 55 : null,
-    debts: debts.length ? 50 : null,
-    spending: spendRows.length ? 45 : null,
-    reminders: reminders.length ? 40 : null,
-    insights: observations.length ? 35 : null,
-    activity: activity.length ? 20 : null,
-  };
-  const layout = (layoutRow[0]?.layout ?? []).filter((l) => isComponentKey(l.key));
-
   return {
     today: ctx.today,
     tz: ctx.tz,
@@ -296,8 +278,8 @@ export async function getDashboard(ctx: Ctx): Promise<DashboardData> {
     activity: activity.map((a) => ({ id: a.id, summary: a.summary, actor: a.actor, at: a.created_at.toISOString() })),
     attention,
     jobs: jobs.map((j) => ({ id: j.id, name: jobLabel(j), rateCents: j.current_rate_cents, hasPayRule: Boolean(j.pay_frequency) })),
-    order: arrange(scores, layout),
-    layout,
+    cards: cardsState.show,
+    onboarded: Boolean(ctx.prefs.onboarded_at),
     isEmpty: jobs.length === 0 && accounts.length === 0 && bills.length === 0 && goals.length === 0 && debts.length === 0 && opps.length === 0,
     coach,
   };

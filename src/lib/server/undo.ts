@@ -41,6 +41,7 @@ export type UndoOp =
   | { op: "uncontribute"; id: string } // goal_contributions
   | { op: "unlink_shifts"; paycheckId: string }
   | { op: "layout"; layout: unknown }
+  | { op: "cards"; cards: unknown }
   | { op: "prefs"; values: Record<string, unknown> };
 
 /** Arrays of numbers are Postgres arrays (pay days); other objects/arrays are JSON columns. */
@@ -100,6 +101,9 @@ export async function applyUndo(q: Q, userId: string, ops: UndoOp[]) {
       }
       case "layout":
         await q`update dashboard_preferences set layout = ${q.json(o.layout as never)}, updated_at = now() where user_id = ${userId}`;
+        break;
+      case "cards":
+        await q`update dashboard_preferences set cards = ${q.json(o.cards as never)}, updated_at = now() where user_id = ${userId}`;
         break;
     }
   }
