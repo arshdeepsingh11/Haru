@@ -48,6 +48,7 @@ export type UndoOp =
 /** Arrays of numbers are Postgres arrays (pay days); other objects/arrays are JSON columns. */
 function encodeValue(q: Q, v: unknown): unknown {
   if (Array.isArray(v) && v.length > 0 && v.every((x) => typeof x === "number")) return q.array(v as number[]);
+  if (v instanceof Date) return v;
   if (v !== null && typeof v === "object") return q.json(v as never);
   return v;
 }

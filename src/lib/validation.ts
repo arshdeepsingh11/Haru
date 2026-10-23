@@ -44,7 +44,7 @@ export const JobCreate = z.object({
 });
 export type JobCreate = z.infer<typeof JobCreate>;
 
-export const JobUpdate = JobCreate.partial().extend({ job_id: zId });
+export const JobUpdate = JobCreate.partial().extend({ job_id: zId, confirm_pay: z.boolean().optional().describe("true when the user says the shown next payday is right") });
 export type JobUpdate = z.infer<typeof JobUpdate>;
 
 export const ShiftCreate = z.object({

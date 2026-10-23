@@ -29,6 +29,13 @@ export interface JobRow {
   regular_schedule: { weekday: number; start: string; end: string; break_minutes?: number }[];
   notes: string | null;
   current_rate_cents: number | null;
+  /** Set once the person told Haru (or picked) their real paydays. */
+  pay_confirmed_at?: Date | string | null;
+}
+
+/** True when the input states the pay calendar explicitly (not a default). */
+function statesPayCalendar(i: Partial<JobCreate> & { confirm_pay?: boolean }) {
+  return Boolean(i.confirm_pay || i.pay_days?.length || i.next_payday || i.payday_weekday != null || i.period_anchor_date);
 }
 
 export interface ServiceResult<T = unknown> {
@@ -122,20 +129,21 @@ function checkRule(input: Partial<JobCreate>, existing?: JobRow) {
 }
 
 export async function createJob(ctx: Ctx, raw: JobCreate, actor: Actor): Promise<ServiceResult<JobRow>> {
+  const confirmed = statesPayCalendar(raw);
   const input = resolvePayInput(raw, undefined, ctx.today);
   checkRule(input);
   return sql.begin(async (tx) => {
     const [job] = await tx<{ id: string }[]>`
       insert into jobs (user_id, employer, title, currency, status, start_date, expected_weekly_minutes, pay_frequency,
         period_anchor_date, semimonthly_split_day, period_start_days, pay_days, payday_offset_days, payday_weekend_rule, deduction_percent,
-        deduction_fixed_cents, regular_schedule, notes)
+        deduction_fixed_cents, regular_schedule, notes, pay_confirmed_at)
       values (${ctx.userId}, ${input.employer}, ${input.title ?? null}, ${ctx.currency}, ${input.status ?? "active"},
         ${input.start_date ?? null}, ${input.expected_weekly_hours != null ? Math.round(input.expected_weekly_hours * 60) : null},
         ${input.pay_frequency ?? null}, ${input.period_anchor_date ?? null}, ${input.semimonthly_split_day ?? 15},
         ${input.period_start_days ? tx.array(input.period_start_days) : null}, ${input.pay_days ? tx.array(input.pay_days) : null},
         ${input.payday_offset_days ?? 0}, ${input.payday_weekend_rule ?? "none"}, ${input.deduction_percent ?? null},
         ${input.deduction_fixed != null ? toCents(input.deduction_fixed) : null}, ${tx.json((input.regular_schedule ?? []) as never)},
-        ${input.notes ?? null})
+        ${input.notes ?? null}, ${confirmed ? new Date() : null})
       returning id`;
     // The first wage applies from the start date (or far back) so earlier shifts resolve a rate.
     const from = input.wage_effective_from ?? input.start_date ?? "2000-01-01";
@@ -168,12 +176,14 @@ const JOB_COLS = [
   "deduction_fixed_cents",
   "regular_schedule",
   "notes",
+  "pay_confirmed_at",
 ] as const;
 
 /** Changes job details. A new hourly rate is added to wage history — past shifts keep their rate. */
 export async function updateJob(ctx: Ctx, raw: JobUpdate, actor: Actor): Promise<ServiceResult<JobRow>> {
   return sql.begin(async (tx) => {
     const before = await getJob(ctx, raw.job_id, tx);
+    const confirmed = statesPayCalendar(raw);
     const input = resolvePayInput(raw, before, ctx.today);
     checkRule(input, before);
     const patch: Record<string, unknown> = {};
@@ -193,6 +203,7 @@ export async function updateJob(ctx: Ctx, raw: JobUpdate, actor: Actor): Promise
     if (input.deduction_fixed !== undefined) patch.deduction_fixed_cents = toCents(input.deduction_fixed);
     if (input.regular_schedule !== undefined) patch.regular_schedule = tx.json(input.regular_schedule as never);
     if (input.notes !== undefined) patch.notes = input.notes;
+    if (confirmed) patch.pay_confirmed_at = new Date();
 
     const undo: UndoOp[] = [];
     const changes: string[] = [];
@@ -200,7 +211,13 @@ export async function updateJob(ctx: Ctx, raw: JobUpdate, actor: Actor): Promise
       const prev = snapshot(before as unknown as Record<string, unknown>, JOB_COLS as unknown as string[]);
       await tx`update jobs set ${tx(patch as Record<string, never>)}, updated_at = now() where id = ${before.id} and user_id = ${ctx.userId}`;
       undo.push({ op: "restore", table: "jobs", id: before.id, values: prev });
-      changes.push(...Object.keys(patch).map((k) => k.replace(/_/g, " ")));
+      if (input.regular_schedule !== undefined) {
+        // The weekly pattern changed: drop upcoming shifts generated from the old pattern
+        // (untouched ones only). The new pattern is filled in on the next load.
+        await tx`delete from shifts where user_id = ${ctx.userId} and job_id = ${before.id} and source = 'schedule'
+                 and status = 'scheduled' and attendance = 'pending' and starts_at > now()`;
+      }
+      changes.push(...Object.keys(patch).map((k) => (k === "pay_confirmed_at" ? "paydays confirmed" : k.replace(/_/g, " "))));
     }
     if (input.hourly_rate !== undefined) {
       const from = input.wage_effective_from ?? ctx.today;
