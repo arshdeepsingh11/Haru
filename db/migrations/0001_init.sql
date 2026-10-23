@@ -433,3 +433,20 @@ create table activity_log (
   created_at timestamptz not null default now()
 );
 create index activity_user_idx on activity_log(user_id, created_at desc);
+
+-- ---------------------------------------------------------------------------
+-- Derived views (deterministic, auditable — every number traces to rows)
+-- ---------------------------------------------------------------------------
+create view account_balances as
+select a.id as account_id, a.user_id, a.name, a.kind, a.is_manual, a.archived_at,
+  a.opening_balance_cents
+  + coalesce(sum(case
+      when t.voided_at is not null then 0
+      when t.account_id = a.id and t.type in ('income','paycheck','adjustment') then t.amount_cents
+      when t.account_id = a.id and t.type in ('expense','debt_payment','transfer') then -t.amount_cents
+      when t.to_account_id = a.id and t.type = 'transfer' then t.amount_cents
+      else 0 end), 0) as balance_cents
+from accounts a
+left join transactions t
+  on (t.account_id = a.id or t.to_account_id = a.id) and t.user_id = a.user_id
+group by a.id;
