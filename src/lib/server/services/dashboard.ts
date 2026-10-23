@@ -23,6 +23,8 @@ export interface AttentionItem {
   title: string;
   detail: string;
   ask?: string; // a prompt the user can send to HARU with one tap
+  /** Pay calendar never confirmed: confirm with a tap or open Jobs & pay. */
+  confirmPay?: { jobId: string; payDate: string | null };
 }
 
 export interface DashboardData {
@@ -212,6 +214,18 @@ export async function getDashboard(ctx: Ctx): Promise<DashboardData> {
   for (const b of billItems) {
     if (b.daysUntil < 0) attention.push({ id: `bill-${b.id}`, tone: "urgent", title: `${b.name} is overdue`, detail: `${m(b.amountCents)} was due ${fd(b.dueDate)}.`, ask: `I paid my ${b.name} bill` });
     else if (b.daysUntil <= 2) attention.push({ id: `bill-${b.id}`, tone: "warn", title: `${b.name} due ${b.daysUntil === 0 ? "today" : b.daysUntil === 1 ? "tomorrow" : `in ${b.daysUntil} days`}`, detail: m(b.amountCents), ask: `I paid my ${b.name} bill` });
+  }
+  // A pay calendar Haru guessed (saved before it asked for exact paydays): confirm or fix it once.
+  for (const j of jobs.filter((x) => x.status === "active" && !x.pay_confirmed_at)) {
+    const f = forecasts.find((x) => x.jobId === j.id);
+    const pay = f?.period?.payDate ?? null;
+    attention.push({
+      id: `confirm-${j.id}`,
+      tone: "warn",
+      title: pay ? `Is ${jobLabel(j)}'s next payday ${fd(pay)}?` : `When does ${jobLabel(j)} pay you?`,
+      detail: pay ? "Haru worked this out before you confirmed your paydays. Check it once so every paycheck is right." : "Set your paydays so Haru can count each shift toward the right paycheck.",
+      confirmPay: { jobId: j.id, payDate: pay },
+    });
   }
   for (const s of missedShifts)
     attention.push({ id: `shift-${s.id}`, tone: "warn", title: `Did you work ${s.job_name} on ${fd(s.work_date)}?`, detail: "This scheduled shift hasn't been logged.", ask: `About my ${s.job_name} shift on ${s.work_date}: ` });

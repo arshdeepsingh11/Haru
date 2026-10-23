@@ -190,7 +190,7 @@ function Ring({ pct, children }: { pct: number; children: React.ReactNode }) {
 }
 
 /** Each job's next paycheck: logged so far vs. what the schedule adds. Swipe sideways on a phone. */
-export function PaycheckCards({ paydays, taxPercent, today, onOpenRecords }: { paydays: DashboardData["paydays"]; taxPercent: number; today: string; onOpenRecords: (t?: string) => void }) {
+export function PaycheckCards({ paydays, taxPercent, today, onOpenJobs }: { paydays: DashboardData["paydays"]; taxPercent: number; today: string; onOpenJobs: (jobId?: string) => void }) {
   const money = useMoney();
   if (!paydays.length) return null;
   const net = (c?: number) => (c == null ? 0 : Math.round(c * (1 - taxPercent / 100)));
@@ -211,13 +211,15 @@ export function PaycheckCards({ paydays, taxPercent, today, onOpenRecords }: { p
               </Ring>
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold">{p.jobName}</p>
-                <p className="text-xs text-ink-3">Payday {dayLabel(p.payDate!, today)}</p>
+                <button className="text-xs text-ink-3 underline-offset-2 hover:underline" onClick={() => onOpenJobs(p.jobId)}>
+                  Payday {dayLabel(p.payDate!, today)} · edit
+                </button>
                 <p className="figure mt-1.5 text-xl">{money(net(p.expectedGrossCents))}</p>
                 <p className="text-xs text-ink-2">{money(net(p.loggedGrossCents))} earned so far</p>
               </div>
             </div>
           ) : (
-            <button key={p.jobId} className="glass w-[82%] max-w-sm shrink-0 snap-start p-4 text-left sm:w-auto sm:flex-1" onClick={() => onOpenRecords("jobs")}>
+            <button key={p.jobId} className="glass w-[82%] max-w-sm shrink-0 snap-start p-4 text-left sm:w-auto sm:flex-1" onClick={() => onOpenJobs(p.jobId)}>
               <p className="text-sm font-semibold">{p.jobName}</p>
               <p className="mt-1 text-sm text-ink-2">Set the paydays so Haru can count toward them.</p>
             </button>

@@ -17,6 +17,7 @@ export interface DashboardProps {
   onAsk: (text: string) => void;
   onOpenRecords: (tab?: string) => void;
   onOpenSchedule: () => void;
+  onOpenJobs: (jobId?: string) => void;
   /** Cards Haru just added, so they can shimmer in once. */
   fresh?: CardKey[];
 }
@@ -35,7 +36,7 @@ function Section({ id, title, aside, children }: { id: string; title: string; as
   );
 }
 
-export function Dashboard({ data, onAsk, onOpenRecords, onOpenSchedule, fresh = [] }: DashboardProps) {
+export function Dashboard({ data, onAsk, onOpenRecords, onOpenSchedule, onOpenJobs, fresh = [] }: DashboardProps) {
   const money = useMoney();
   const { run, pending } = useAct();
   const toast = useToast();
@@ -47,7 +48,7 @@ export function Dashboard({ data, onAsk, onOpenRecords, onOpenSchedule, fresh = 
   // Each card renders its content, or null when it has nothing real to show yet.
   const render: Record<CardKey, () => React.ReactNode> = {
     next_shift: () => <NextShiftHero c={c} today={t} onOpenSchedule={onOpenSchedule} />,
-    paychecks: () => (data.paydays.length ? <PaycheckCards paydays={data.paydays} taxPercent={c.taxPercent} today={t} onOpenRecords={onOpenRecords} /> : null),
+    paychecks: () => (data.paydays.length ? <PaycheckCards paydays={data.paydays} taxPercent={c.taxPercent} today={t} onOpenJobs={onOpenJobs} /> : null),
     week: () => <WeekStrip c={c} today={t} onOpenSchedule={onOpenSchedule} />,
     stats: () => <StatTiles c={c} />,
     payoff: () => <PayoffPlanCard c={c} onAsk={onAsk} />,
@@ -261,7 +262,7 @@ export function Dashboard({ data, onAsk, onOpenRecords, onOpenSchedule, fresh = 
       </div>
 
       <CheckoutCards items={c.checkouts} today={t} taxPercent={c.taxPercent} />
-      {data.attention.length > 0 && <AttentionList items={data.attention} onAsk={onAsk} />}
+      {data.attention.length > 0 && <AttentionList items={data.attention} onAsk={onAsk} onOpenJobs={onOpenJobs} />}
 
       {shown.length === 0 ? (
         <section className="glass grid justify-items-center gap-3 px-6 py-10 text-center">
@@ -300,8 +301,9 @@ export function Dashboard({ data, onAsk, onOpenRecords, onOpenSchedule, fresh = 
 }
 
 /** Calm, capped list: the most urgent first; the rest behind "Show N more". */
-function AttentionList({ items, onAsk }: { items: DashboardData["attention"]; onAsk: (t: string) => void }) {
+function AttentionList({ items, onAsk, onOpenJobs }: { items: DashboardData["attention"]; onAsk: (t: string) => void; onOpenJobs: (jobId?: string) => void }) {
   const [all, setAll] = useState(false);
+  const { run, pending } = useAct();
   const shown = all ? items : items.slice(0, 3);
   return (
     <section aria-label="Needs attention" className="grid gap-2">
@@ -312,10 +314,23 @@ function AttentionList({ items, onAsk }: { items: DashboardData["attention"]; on
             <p className="font-semibold">{a.title}</p>
             <p className="text-sm text-ink-2">{a.detail}</p>
           </div>
-          {a.ask && (
-            <button className="btn btn-line ml-[1.875rem] shrink-0 py-1 text-xs sm:ml-0" onClick={() => onAsk(a.ask!)}>
-              Tell HARU
-            </button>
+          {a.confirmPay ? (
+            <div className="ml-[1.875rem] flex shrink-0 gap-2 sm:ml-0">
+              {a.confirmPay.payDate && (
+                <button className="btn btn-primary h-9 min-h-0 px-3 text-xs" disabled={pending} onClick={() => run("updateJob", { job_id: a.confirmPay!.jobId, confirm_pay: true })}>
+                  Yes, right
+                </button>
+              )}
+              <button className="btn btn-line h-9 min-h-0 px-3 text-xs" onClick={() => onOpenJobs(a.confirmPay!.jobId)}>
+                {a.confirmPay.payDate ? "Fix paydays" : "Set paydays"}
+              </button>
+            </div>
+          ) : (
+            a.ask && (
+              <button className="btn btn-line ml-[1.875rem] shrink-0 py-1 text-xs sm:ml-0" onClick={() => onAsk(a.ask!)}>
+                Tell Haru
+              </button>
+            )
           )}
         </div>
       ))}
