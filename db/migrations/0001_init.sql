@@ -458,3 +458,10 @@ select d.id as debt_id, d.user_id, d.name, d.status, d.starting_balance_cents,
 from debts d
 left join transactions t on t.debt_id = d.id and t.type = 'debt_payment' and t.user_id = d.user_id
 group by d.id;
+
+create view goal_progress as
+select g.id as goal_id, g.user_id, g.name, g.status, g.target_cents, g.target_date, g.monthly_target_cents,
+  coalesce(sum(c.amount_cents) filter (where c.voided_at is null), 0) as saved_cents
+from savings_goals g
+left join goal_contributions c on c.goal_id = g.id and c.user_id = g.user_id
+group by g.id;
